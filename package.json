@@ -1,0 +1,13 @@
+{
+  "name": "twin-moon-river",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test tools/*.test.mjs" },
+  "devDependencies": {
+    "three": "0.187.0",
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "@gltf-transform/cli": "^4.2.0"
+  }
+}
