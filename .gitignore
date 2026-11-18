@@ -6,3 +6,4 @@ node_modules/
 art-src/**/*.glb
 art-src/hero/views-sheet-*.png
 art-src/hero/hero-poses.png
+tools/playtest/
