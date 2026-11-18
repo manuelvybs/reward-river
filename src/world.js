@@ -3,6 +3,8 @@
 import * as THREE from 'three';
 import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS, ROOTS, COLLIDERS } from './level.js';
 import { PALETTE as C, SUN, TUNING } from './config.js';
+import { terrainMaterial, tiled, boxWorldUV, atlasCell } from './paint.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const col = c => new THREE.Color(c);
 const lerpC = (a, b, t) => col(a).lerp(col(b), Math.min(1, Math.max(0, t)));
@@ -11,10 +13,11 @@ const n1 = (a, b = 0) => Math.sin(a * 0.31 + b) * 0.6 + Math.sin(a * 0.83 + b * 
 const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...o });
 
-// a grid surface from rows of points (rows[i][j]); colors(i, j, p) -> THREE.Color
-function gridMesh(rows, colors, material) {
-  const R = rows.length, Cn = rows[0].length, pos = [], cols = [], idx = [];
-  rows.forEach((row, i) => row.forEach((p, j) => { pos.push(p.x, p.y, p.z); const c = colors(i, j, p); cols.push(c.r, c.g, c.b); }));
+// a grid surface from rows of points (rows[i][j]); colors(i, j, p) -> THREE.Color; uvs(i, j, p) -> [u, v] (optional)
+const vc = (r, g = 0, b = 0) => new THREE.Color(r, g, b);     // terrain vertex colour: brightness, moss weight, alt weight
+function gridMesh(rows, colors, material, uvs) {
+  const R = rows.length, Cn = rows[0].length, pos = [], cols = [], idx = [], uv = [];
+  rows.forEach((row, i) => row.forEach((p, j) => { pos.push(p.x, p.y, p.z); const c = colors(i, j, p); cols.push(c.r, c.g, c.b); if (uvs) uv.push(...uvs(i, j, p)); }));
   for (let i = 0; i < R - 1; i++) for (let j = 0; j < Cn - 1; j++) {
     const a = i * Cn + j, b = a + 1, c = a + Cn, d = c + 1;
     idx.push(a, c, b, b, c, d);
@@ -22,6 +25,7 @@ function gridMesh(rows, colors, material) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  if (uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return new THREE.Mesh(g, material);
@@ -75,8 +79,9 @@ function crystal(r, h) {
   const g = new THREE.Group(); g.add(m); CRYSTALS.push({ g, r, h }); return g;
 }
 
-export function buildWorld(scene) {
+export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} }) {
   const W = { medals: [], anim: [] };
+  const T = paint.tex, sm = (t, color, o = {}) => t ? std(0xffffff, { map: t, ...o, color }) : std(color, o);
 
   // ------------------------------------------------------------------------------------------ sky + moons
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), new THREE.ShaderMaterial({
@@ -99,9 +104,20 @@ export function buildWorld(scene) {
   ];
   moons.forEach(m => { m.s.scale.setScalar(m.size); m.s.renderOrder = -9; scene.add(m.s); });
 
-  // far mesas: fogged silhouettes all around
+  // painted far backdrops on a camera-following arc (behind everything): canyon mesas on foot, the colony skyline on
+  // the river, crossfaded by progress. Their painted bottoms sit just under the horizon.
+  const backdrops = new THREE.Group(); scene.add(backdrops);
+  const bdMat = {};
+  for (const [name, t] of Object.entries(paint.backdrops)) {
+    if (!t) continue;
+    t.wrapS = THREE.MirroredRepeatWrapping; t.repeat.x = 2; t.offset.x = 0.5; t.needsUpdate = true;   // mirror joints off to the sides, not dead ahead
+    const arc = Math.PI * 1.25, R = 1100, H = R * arc / 2 / (t.image.width / t.image.height);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 64, 1, true, Math.PI - arc / 2, arc),
+      bdMat[name] = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide, opacity: name === 'canyon' ? 1 : 0 }));
+    m.position.y = H / 2 - H * 0.42; m.renderOrder = -8; backdrops.add(m);
+  }
   const mesaMat = std(C.rockDark, { flatShading: true });
-  for (let k = 0; k < 46; k++) {
+  for (let k = 0; k < (Object.keys(bdMat).length ? 0 : 46); k++) {
     const a = k / 46 * Math.PI * 2 + n1(k) * 0.2, d = 420 + (k * 97 % 260), h = 70 + (k * 53 % 110);
     const m = new THREE.Mesh(new THREE.CylinderGeometry(24 + k % 5 * 6, 40 + k % 7 * 6, h, 6), mesaMat);
     m.position.set(Math.cos(a) * d, h / 2 - 20, -300 + Math.sin(a) * d * 1.3); m.rotation.y = k;
@@ -112,7 +128,8 @@ export function buildWorld(scene) {
   const chasmT = z => ease(Math.min(1, Math.max(0, (FOOT.edgeZ + 3 - z) / 4))) * ease(Math.min(1, Math.max(0, (z - (FOOT.farZ - 3)) / 4)));
   const wallHalf = z => THREE.MathUtils.lerp(footWidth(z) / 2 + 0.35, 12.5, chasmT(z));
   const groundAt = z => { const g = footGround(footCenter(z), z); return Number.isFinite(g) ? g : (z > FOOT.farZ ? -46 : FOOT.landY); };
-  const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, side: THREE.DoubleSide });
+  const rockMat = terrainMaterial({ base: T.rock, moss: T.moss, fallback: C.rock, flat: true });
+  const bankMat = terrainMaterial({ base: T.rock, alt: T.stone, moss: T.moss, fallback: C.rock, flat: true });
   const wallTop = (z, side) => 15 + 4 * n1(z * 0.5, side) + 5 * chasmT(z);
   for (const side of [-1, 1]) {
     const rows = [];
@@ -124,14 +141,15 @@ export function buildWorld(scene) {
       row.push(new THREE.Vector3(xb + side * (3.5 + n1(z, 9)), top + 0.6, z), new THREE.Vector3(xb + side * 60, top + 3, z));
       rows.push(row);
     }
-    const mesh = gridMesh(rows, (i, j, p) => j >= 7 ? lerpC(C.moss, C.mossDark, 0.5 + 0.5 * n1(p.z, j)) : lerpC(C.rockDark, C.rockLight, (p.y + 8) / 26 + 0.15 * n1(p.z * 2, j)), rockMat);
+    const mesh = gridMesh(rows, (i, j, p) => vc(0.74 + 0.26 * Math.min(1, Math.max(0, (p.y + 8) / 26)) + 0.06 * n1(p.z * 2, j), j >= 7 ? 1 : j === 6 ? 0.2 : 0), rockMat,
+      (i, j, p) => [p.z / 9, p.y / 9 + (j >= 7 ? j * 0.7 : 0)]);
     if (side > 0) mesh.geometry.index.array.reverse();
     mesh.geometry.computeVertexNormals();
     mesh.receiveShadow = mesh.castShadow = true;
     scene.add(mesh);
   }
   // walkable floors: trail, landing, quay (ribbons out to the wall feet)
-  const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide });
+  const groundMat = terrainMaterial({ base: T.path, moss: T.moss, fallback: C.path });
   const floor = (z0, z1, yFn) => {
     const rows = [];
     for (let z = z0; z >= z1 - 0.01; z -= 0.75) {
@@ -139,13 +157,14 @@ export function buildWorld(scene) {
       for (let j = 0; j <= 8; j++) { const x = c - h + 2 * h * j / 8; row.push(new THREE.Vector3(x, yFn(x, z), z)); }
       rows.push(row);
     }
-    const m = gridMesh(rows, (i, j, p) => { const t = Math.abs(p.x - footCenter(p.z)) / (footWidth(p.z) / 2); return t < 0.6 ? lerpC(C.path, C.pathDark, 0.5 + 0.5 * n1(p.z * 3, p.x)) : lerpC(C.mossDark, C.moss, 0.5 + 0.5 * n1(p.z * 2, p.x * 2)); }, groundMat);
+    const m = gridMesh(rows, (i, j, p) => { const t = Math.abs(p.x - footCenter(p.z)) / (footWidth(p.z) / 2); return vc(0.97 + 0.05 * n1(p.z * 3, p.x), THREE.MathUtils.smoothstep(t, 0.45, 0.8)); }, groundMat,
+      (i, j, p) => [p.x / 4, p.z / 4]);
     m.receiveShadow = true; scene.add(m);
   };
   floor(42, FOOT.edgeZ, (x, z) => footGround(x, z));
   floor(FOOT.farZ, FOOT.stepsZ0, () => FOOT.landY);
   // roots across the trail (jump them) with glowing alien nodules, and boulders to run around
-  const barkM = std(C.bark, { roughness: 0.95 }), glowM = new THREE.MeshStandardMaterial({ color: C.crystal, emissive: col(C.crystal), emissiveIntensity: 0.9 });
+  const barkM = sm(tiled(T.bark, 6, 1), T.bark ? 0xffffff : C.bark, { roughness: 0.95 }), glowM = new THREE.MeshStandardMaterial({ color: C.crystal, emissive: col(C.crystal), emissiveIntensity: 0.9 });
   for (const o of ROOTS) {
     const c = footCenter(o.z), g = footGround(c, o.z), r = o.h / 2, pts = [];
     for (let k = 0; k <= 8; k++) { const x = c + o.x0 - 0.8 + (o.x1 - o.x0 + 1.6) * k / 8; const lift = k === 0 || k === 8 ? -0.35 : 0; pts.push(new THREE.Vector3(x, g + r + lift + 0.05 * Math.sin(k * 1.7), o.z + 0.12 * Math.sin(k * 2.3))); }
@@ -163,7 +182,7 @@ export function buildWorld(scene) {
   const face = (z, yTop, flip) => {
     const rows = [];
     for (let y = yTop; y >= -46; y -= 4) { const row = []; for (let j = 0; j <= 10; j++) { const x = -13 + 26 * j / 10; row.push(new THREE.Vector3(x, y, z + (flip ? -1 : 1) * (0.5 + 0.6 * n1(x * 2 + y, z)))); } rows.push(row); }
-    const m = gridMesh(rows, (i, j, p) => lerpC(C.rockDark, C.rock, (p.y + 46) / 50), rockMat);
+    const m = gridMesh(rows, (i, j, p) => vc(0.55 + 0.45 * Math.min(1, (p.y + 46) / 50)), rockMat, (i, j, p) => [p.x / 9, p.y / 9]);
     if (flip) m.geometry.index.array.reverse();
     m.geometry.computeVertexNormals(); m.receiveShadow = true; scene.add(m);
   };
@@ -201,15 +220,15 @@ export function buildWorld(scene) {
   W.anim.push((dt, t) => { pod.material.emissiveIntensity = 0.9 + 0.5 * Math.sin(t * 3); });
 
   // steps, crystal pillars, quay
-  const stoneMat = std(C.stone, { roughness: 0.9 }), stoneDark = std(C.stoneDark, { roughness: 0.9 });
+  const stoneMat = sm(T.stone, T.stone ? 0xffffff : C.stone, { roughness: 0.9 }), stoneDark = sm(T.stone, T.stone ? 0xe2cfb0 : C.stoneDark, { roughness: 0.9 });
   const dz = (FOOT.stepsZ0 - FOOT.stepsZ1) / FOOT.stepN, dy = (FOOT.stepTop - FOOT.landY) / FOOT.stepN;
   for (let i = 0; i < FOOT.stepN; i++) {
     const top = FOOT.landY + (i + 1) * dy, hgt = top - FOOT.landY + 0.6;
-    const s = new THREE.Mesh(new THREE.BoxGeometry(5.6, hgt, dz + 0.02), i % 2 ? stoneMat : stoneDark);
+    const s = new THREE.Mesh(boxWorldUV(new THREE.BoxGeometry(5.6, hgt, dz + 0.02), 5.6, hgt, dz + 0.02, 2.2), i % 2 ? stoneMat : stoneDark);
     s.position.set(0, top - hgt / 2, FOOT.stepsZ0 - (i + 0.5) * dz); s.receiveShadow = s.castShadow = true; scene.add(s);
   }
   const quayLen = FOOT.stepsZ1 - (FOOT.quayZ - 2.5);
-  const quay = new THREE.Mesh(new THREE.BoxGeometry(14, 9, quayLen), stoneMat);
+  const quay = new THREE.Mesh(boxWorldUV(new THREE.BoxGeometry(14, 9, quayLen), 14, 9, quayLen, 2.6), stoneMat);
   quay.position.set(0, FOOT.stepTop - 4.5, FOOT.stepsZ1 - quayLen / 2); quay.receiveShadow = true; scene.add(quay);
   for (const [x, z, h] of [[-2.35, -80, 7], [2.35, -88, 9], [-3.1, -96, 10], [3.1, -101, 8], [-3.1, -105.5, 11], [3.1, -105.5, 9], [-5, -114, 8], [5, -114, 10]]) {
     const c = crystal(0.75, h); c.position.set(x, footGround(0, z), z); c.rotation.y = x; scene.add(c);
@@ -231,17 +250,20 @@ export function buildWorld(scene) {
     for (let j = 0; j <= 6; j++) { const o = -hw + 2 * hw * j / 6; row.push(new THREE.Vector3(f.x + f.nx * o, f.y, f.z + f.nz * o)); }
     waterRows.push(row);
   }
-  const waterGeo = gridMesh(waterRows, (i, j) => lerpC(C.waterDeep, C.water, Math.abs(j - 3) / 3 * 0.8 + 0.2), null).geometry;
+  const flow = T.water || flowTex;
+  const waterGeo = gridMesh(waterRows, (i, j) => T.water ? vc(0.8 + 0.2 * Math.abs(j - 3) / 3, 0.8 + 0.2 * Math.abs(j - 3) / 3, 0.85 + 0.15 * Math.abs(j - 3) / 3) : lerpC(C.waterDeep, C.water, Math.abs(j - 3) / 3 * 0.8 + 0.2), null).geometry;
   const uv = [];
   waterRows.forEach((row, i) => row.forEach((p, j) => uv.push(j / 6 * 2, i / 9)));
   waterGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: flowTex, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: col(C.water), emissiveIntensity: 0.22 }));
+  const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: flow, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: col(C.water), emissiveIntensity: T.water ? 0.1 : 0.22 }));
   water.receiveShadow = true; scene.add(water);
-  W.anim.push((dt, t, p) => { flowTex.offset.y += dt * (p?.raft ? 0.55 : 0.5); });
+  const lagoonFlow = tiled(flow, 8, 8);
+  W.anim.push(dt => { flow.offset.y -= dt * 0.55; if (lagoonFlow) lagoonFlow.offset.y -= dt * 0.04; });
 
   // foam over the three drops
   const foamTex = canvasTex(128, 128, (x, w, h) => { x.clearRect(0, 0, w, h); for (let k = 0; k < 70; k++) { x.fillStyle = `rgba(255,255,255,${0.35 + (k % 5) * 0.12})`; x.beginPath(); x.ellipse((k * 47) % w, (k * 29) % h, 4 + k % 9, 2 + k % 5, k, 0, 7); x.fill(); } });
-  const foamMat = new THREE.MeshBasicMaterial({ map: foamTex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const foamT = paint.sprites.foam || foamTex;
+  const foamMat = new THREE.MeshBasicMaterial({ map: foamT, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   for (const sd of RIVER.drops) {
     const rows = [];
     for (let s = sd - 8; s <= sd + 12; s += 1) { const f = riverAt(s), hw = f.width / 2, row = []; for (let j = 0; j <= 4; j++) { const o = -hw + 2 * hw * j / 4; row.push(new THREE.Vector3(f.x + f.nx * o, f.y + 0.06, f.z + f.nz * o)); } rows.push(row); }
@@ -249,8 +271,8 @@ export function buildWorld(scene) {
     const fuv = []; rows.forEach((row, i) => row.forEach((p, j) => fuv.push(j, i / 5))); g.setAttribute('uv', new THREE.Float32BufferAttribute(fuv, 2));
     scene.add(new THREE.Mesh(g, foamMat));
   }
-  W.anim.push(dt => { foamTex.offset.y += dt * 1.6; });
-  foamTex.repeat.set(3, 1);
+  W.anim.push(dt => { foamT.offset.y -= dt * 1.6; });
+  foamT.repeat.set(3, 1);
 
   // banks: rock in the gorge, pale colony stone through the flooded city
   const colony = s => s > 50 && s < RIVER.archS + 20;
@@ -263,14 +285,15 @@ export function buildWorld(scene) {
       const o2 = side * (base + 40); row.push(new THREE.Vector3(f.x + f.nx * o2, top + 2, f.z + f.nz * o2));
       rows.push(row);
     }
-    const m = gridMesh(rows, (i, j, p) => { const s = -6 + i * 2; return j === 5 ? lerpC(C.moss, C.mossDark, 0.5 + 0.5 * n1(s, 3)) : colony(s) ? lerpC(C.stoneDark, C.stone, j / 4 + 0.1 * n1(s, j)) : lerpC(C.rockDark, C.rockLight, j / 4 + 0.15 * n1(s, j)); }, rockMat);
+    const m = gridMesh(rows, (i, j, p) => { const s = -6 + i * 2; return vc(0.7 + 0.3 * Math.min(1, j / 4) + 0.05 * n1(s, j), j === 5 ? 1 : 0, colony(s) ? 1 : 0); }, bankMat,
+      (i, j, p) => [(-6 + i * 2) / 9, p.y / 9 + (j === 5 ? 3 : 0)]);
     if (side < 0) m.geometry.index.array.reverse();
     m.geometry.computeVertexNormals(); m.receiveShadow = true; scene.add(m);
   }
   // colony ruins along the banks
   for (let k = 0; k < 70; k++) {
     const s = 60 + k * 5.2, f = riverAt(s), side = k % 2 ? 1 : -1, o = side * (f.width / 2 + 2 + (k * 7 % 5));
-    const h = 3 + (k * 13 % 9), b = new THREE.Mesh(new THREE.BoxGeometry(2 + k % 3, h, 2 + (k * 5) % 3), k % 4 ? stoneMat : stoneDark);
+    const h = 3 + (k * 13 % 9), bw = 2 + k % 3, bd = 2 + (k * 5) % 3, b = new THREE.Mesh(boxWorldUV(new THREE.BoxGeometry(bw, h, bd), bw, h, bd, 2.2), k % 4 ? stoneMat : stoneDark);
     b.position.set(f.x + f.nx * o, f.y + h / 2 + 2.5, f.z + f.nz * o); b.rotation.y = k; b.castShadow = true; scene.add(b);
   }
 
@@ -313,10 +336,55 @@ export function buildWorld(scene) {
   // the lagoon
   {
     const f = riverAt(RIVER.endS + 45);
-    const lag = new THREE.Mesh(new THREE.CircleGeometry(48, 48), new THREE.MeshStandardMaterial({ color: C.water, map: flowTex, roughness: 0.2, transparent: true, opacity: 0.95 }));
+    const lag = new THREE.Mesh(new THREE.CircleGeometry(48, 48), new THREE.MeshStandardMaterial({ color: T.water ? 0xffffff : C.water, map: lagoonFlow || flowTex, roughness: 0.25, transparent: true, opacity: 0.95, emissive: col(C.water), emissiveIntensity: 0.1 }));
     lag.rotation.x = -Math.PI / 2; lag.position.set(f.x, f.y - 0.02, f.z); scene.add(lag);
-    const sand = new THREE.Mesh(new THREE.RingGeometry(40, 95, 48), std(C.path)); sand.rotation.x = -Math.PI / 2; sand.position.set(f.x, f.y + 0.35, f.z); sand.receiveShadow = true; scene.add(sand);
+    const sand = new THREE.Mesh(new THREE.RingGeometry(40, 95, 48), sm(tiled(T.path, 14, 14), T.path ? 0xffffff : C.path)); sand.rotation.x = -Math.PI / 2; sand.position.set(f.x, f.y + 0.35, f.z); sand.receiveShadow = true; scene.add(sand);
     for (let k = 0; k < 9; k++) { const a = Math.PI * (0.15 + k * 0.09), c = crystal(1.2, 8 + k % 4 * 3); c.position.set(f.x + Math.cos(a) * 44, f.y, f.z - Math.sin(a) * 44); scene.add(c); }
+  }
+
+  // ------------------------------------------------------------------------------------------ foliage + foam
+  // foliage: crossed-quad sprites from the 2x2 atlas (grass, fern, glowing flowers, bush), one InstancedMesh per kind
+  const atlas = paint.sprites.foliage;
+  if (atlas) {
+    const KINDS = [{ cell: atlasCell(0, 0), w: 1.0, h: 1.0 }, { cell: atlasCell(1, 0), w: 1.3, h: 1.1 }, { cell: atlasCell(0, 1), w: 0.8, h: 0.9, glow: true }, { cell: atlasCell(1, 1), w: 1.4, h: 1.2 }];
+    const quad = (cell, w, h) => {
+      const a = new THREE.PlaneGeometry(w, h); a.translate(0, h / 2 - 0.04, 0);
+      const uv = a.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, cell.u0 + uv.getX(i) * (cell.u1 - cell.u0), cell.v0 + uv.getY(i) * (cell.v1 - cell.v0));
+      return mergeGeometries([a, a.clone().rotateY(Math.PI / 2)]);
+    };
+    const spots = KINDS.map(() => []), rnd = rng(5);
+    const pick = () => { const r = rnd(); return r < 0.42 ? 0 : r < 0.66 ? 1 : r < 0.82 ? 3 : 2; };
+    const add = (x, y, z, sc) => spots[pick()].push([x, y, z, sc, rnd() * 6.28]);
+    for (let z = 40; z > FOOT.edgeZ + 1; z -= 0.5) {                       // trail edges (moss strip)
+      const c = footCenter(z), hw = footWidth(z) / 2, side = rnd() < 0.5 ? -1 : 1, x = c + side * hw * (0.72 + rnd() * 0.4);
+      add(x, footGround(x, z), z + rnd() * 0.4, 0.7 + rnd() * 0.7);
+    }
+    for (let z = FOOT.farZ - 1; z > FOOT.stepsZ0 + 1; z -= 0.6) { const side = rnd() < 0.5 ? -1 : 1; add(side * footWidth(z) / 2 * (0.75 + rnd() * 0.35), FOOT.landY, z, 0.7 + rnd() * 0.6); }
+    for (let s = 2; s < RIVER.endS + 20; s += 3) for (const side of [-1, 1]) {       // bank rims, seen from the raft
+      const f = riverAt(s), o = side * (f.width / 2 + 1.0 + rnd() * 3.5);
+      add(f.x + f.nx * o, bankTop(s, side) + 0.1, f.z + f.nz * o, 1.3 + rnd() * 1.4);
+    }
+    const lc = riverAt(RIVER.endS + 45);
+    for (let k = 0; k < 60; k++) { const a = rnd() * Math.PI * 2, d = 41 + rnd() * 14; add(lc.x + Math.cos(a) * d, lc.y + 0.35, lc.z + Math.sin(a) * d, 1 + rnd()); }
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    KINDS.forEach((k, i) => {
+      const mat = new THREE.MeshStandardMaterial({ map: atlas, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1,
+        ...(k.glow ? { emissive: col(0xffffff), emissiveMap: atlas, emissiveIntensity: 0.55 } : {}) });
+      const im = new THREE.InstancedMesh(quad(k.cell, k.w, k.h), mat, spots[i].length);
+      spots[i].forEach(([x, y, z, sc, yaw], n) => im.setMatrixAt(n, m4.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw), new THREE.Vector3(sc, sc, sc))));
+      im.receiveShadow = true; im.frustumCulled = false; scene.add(im);
+    });
+    W.foliageCount = spots.reduce((n, a) => n + a.length, 0);
+  }
+  // foam rings where the water meets statues, crystals and rocks
+  if (paint.sprites.foam) {
+    const ringT = tiled(paint.sprites.foam, 1, 1);
+    const ringMat = new THREE.MeshBasicMaterial({ map: ringT, transparent: true, depthWrite: false, opacity: 0.85 });
+    for (const o of OBSTACLES) {
+      const ring = new THREE.Mesh(new THREE.PlaneGeometry(o.r * 2 + 2.4, o.r * 2 + 2.4), ringMat);
+      ring.rotation.x = -Math.PI / 2; ring.position.set(o.x, o.y + 0.05, o.z); scene.add(ring);
+      const spin = (o.s % 2 ? 1 : -1) * 0.15; W.anim.push(dt => { ring.rotation.z += dt * spin; });
+    }
   }
 
   // ------------------------------------------------------------------------------------------ medals
@@ -349,6 +417,12 @@ export function buildWorld(scene) {
   W.update = (dt, t, p, hero, camera) => {
     for (const a of W.anim) a(dt, t, p);
     sky.position.copy(camera.position);
+    backdrops.position.copy(camera.position);
+    if (bdMat.canyon || bdMat.colony) {
+      const river = p.mode === 'raft' || p.mode === 'end' || p.mode === 'board' ? 1 : Math.min(1, Math.max(0, (-96 - p.pos.z) / 22));
+      if (bdMat.canyon) bdMat.canyon.opacity = 1 - river;
+      if (bdMat.colony) bdMat.colony.opacity = river;
+    }
     for (const m of moons) {
       const az = THREE.MathUtils.degToRad(m.az), el = THREE.MathUtils.degToRad(m.el);
       m.s.position.set(camera.position.x + Math.sin(az) * Math.cos(el) * 1300, camera.position.y + Math.sin(el) * 1300, camera.position.z - Math.cos(az) * Math.cos(el) * 1300);

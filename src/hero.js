@@ -10,7 +10,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 const qTilt = new THREE.Quaternion(), qYaw = new THREE.Quaternion(), q = new THREE.Quaternion(), v = new THREE.Vector3();
 
 export async function loadHero(url = HERO.url) {
-  const gltf = await new GLTFLoader().loadAsync(url);
+  const loader = new GLTFLoader();
+  const gltf = await loader.loadAsync(url).catch(() => new Promise(r => setTimeout(r, 400)).then(() => loader.loadAsync(url)));
   const model = gltf.scene;
   model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   const box = new THREE.Box3().setFromObject(model);

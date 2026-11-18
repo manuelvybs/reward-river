@@ -5,6 +5,7 @@ import { Player, autopilot } from './player.js';
 import { buildWorld } from './world.js';
 import { loadHero } from './hero.js';
 import { loadProps } from './props.js';
+import { loadPaint } from './paint.js';
 import { ChaseCamera } from './camera.js';
 import { Input } from './input.js';
 import { PALETTE, GAME, SUN } from './config.js';
@@ -36,7 +37,7 @@ sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
 const SUN_DIR = new THREE.Vector3(...SUN.dir).normalize();
 
-const world = buildWorld(scene);
+const world = buildWorld(scene, await loadPaint());
 const input = new Input(renderer.domElement);
 const cam = new ChaseCamera(camera);
 const player = new Player();

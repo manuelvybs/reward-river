@@ -17,13 +17,16 @@ export const PROPS = {
   arch: { url: 'assets/models/arch.glb', yaw: 270, scale: 38 },                                     // spans the river, rocket upstream
 };
 
+// one retry: a dropped connection should not cost a prop
+const retry = (fn, n = 1) => fn().catch(e => (n > 0 ? new Promise(r => setTimeout(r, 400)).then(() => retry(fn, n - 1)) : Promise.reject(e)));
+
 export async function loadProps(names = Object.keys(PROPS)) {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const out = {};
   await Promise.all(names.map(async name => {
     const spec = PROPS[name];
     try {
-      const gltf = await loader.loadAsync(spec.url);
+      const gltf = await retry(() => loader.loadAsync(spec.url));
       gltf.scene.traverse(o => {
         if (!o.isMesh) return;
         o.castShadow = true; o.receiveShadow = true;

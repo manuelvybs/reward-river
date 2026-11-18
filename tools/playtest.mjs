@@ -11,7 +11,9 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('console', m => m.type() === 'error' && errors.push('console: ' + m.text()));
 page.on('pageerror', e => errors.push('pageerror: ' + e));
-page.on('requestfailed', r => errors.push('requestfailed: ' + r.url()));
+const failed = new Map();   // a failed request only counts if the game never fetched that URL afterwards (it retries once)
+page.on('requestfailed', r => failed.set(r.url(), r.failure()?.errorText));
+page.on('requestfinished', r => failed.delete(r.url()));
 page.on('response', r => r.status() >= 400 && errors.push(`http ${r.status()}: ${r.url()}`));
 const t0 = Date.now();
 await page.goto(base + (base.includes('?') ? '&' : '?') + 'autopilot');
@@ -44,6 +46,7 @@ while (b < beats.length && Date.now() - t0 < 200000) {
 }
 fps = await page.evaluate(() => new Promise(r => { let n = 0; const t = performance.now(); const f = () => { n++; if (performance.now() - t < 1000) requestAnimationFrame(f); else r(n); }; requestAnimationFrame(f); }));
 await browser.close();
+for (const [u, why] of failed) errors.push(`requestfailed: ${u} (${why})`);
 const ok = b === beats.length && errors.length === 0 && last.respawns === 0;
 console.log(`\n${ok ? 'PASS' : 'FAIL'}: ${b}/${beats.length} beats, ${last?.medals} medals, ${last?.respawns} respawns, ${errors.length} errors, ~${fps} fps headless, ${((Date.now() - t0) / 1000).toFixed(0)} s wall`);
 if (errors.length) console.log(errors.slice(0, 10).join('\n'));
