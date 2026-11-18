@@ -3,9 +3,11 @@
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import fs from 'node:fs';
+import { MeshoptDecoder } from 'meshoptimizer';
 
 const [file, flag, list] = process.argv.slice(2);
-const doc = await new NodeIO().registerExtensions(ALL_EXTENSIONS).read(file);
+await MeshoptDecoder.ready;
+const doc = await new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder }).read(file);
 const root = doc.getRoot();
 let tris = 0;
 for (const m of root.listMeshes()) for (const p of m.listPrimitives()) {

@@ -8,6 +8,7 @@ const col = c => new THREE.Color(c);
 const lerpC = (a, b, t) => col(a).lerp(col(b), Math.min(1, Math.max(0, t)));
 const ease = t => t * t * (3 - 2 * t);
 const n1 = (a, b = 0) => Math.sin(a * 0.31 + b) * 0.6 + Math.sin(a * 0.83 + b * 1.7 + 1.3) * 0.3 + Math.sin(a * 1.9 + b * 0.5) * 0.1;
+const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...o });
 
 // a grid surface from rows of points (rows[i][j]); colors(i, j, p) -> THREE.Color
@@ -112,11 +113,12 @@ export function buildWorld(scene) {
   const wallHalf = z => THREE.MathUtils.lerp(footWidth(z) / 2 + 0.35, 12.5, chasmT(z));
   const groundAt = z => { const g = footGround(footCenter(z), z); return Number.isFinite(g) ? g : (z > FOOT.farZ ? -46 : FOOT.landY); };
   const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, side: THREE.DoubleSide });
+  const wallTop = (z, side) => 15 + 4 * n1(z * 0.5, side) + 5 * chasmT(z);
   for (const side of [-1, 1]) {
     const rows = [];
     for (let z = 42; z >= -117; z -= 1.5) {
       const xb = footCenter(z) + side * wallHalf(z), yb = Math.min(groundAt(z), groundAt(z + 1.5), groundAt(z - 1.5)) - 0.6;
-      const top = 15 + 4 * n1(z * 0.5, side) + 5 * chasmT(z);
+      const top = wallTop(z, side);
       const row = [new THREE.Vector3(xb, yb, z)];
       for (let v = 1; v <= 6; v++) row.push(new THREE.Vector3(xb + side * (0.3 * v + 0.9 * n1(z + v * 7, side * 3)), yb + (top - yb) * v / 6, z + 0.4 * n1(v * 3 + z, side)));
       row.push(new THREE.Vector3(xb + side * (3.5 + n1(z, 9)), top + 0.6, z), new THREE.Vector3(xb + side * 60, top + 3, z));
@@ -151,9 +153,11 @@ export function buildWorld(scene) {
     root.castShadow = root.receiveShadow = true; scene.add(root);
     for (let k = 1; k < 8; k += 2) { const n = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), glowM); n.position.copy(pts[k]).add(new THREE.Vector3(0, r * 0.9, 0)); scene.add(n); }
   }
+  const rocks = [];
   for (const o of COLLIDERS) {
     const b = new THREE.Mesh(new THREE.DodecahedronGeometry(o.r * 1.15, 0), std(C.rockDark, { flatShading: true }));
     b.position.set(o.x, footGround(o.x, o.z) + o.r * 0.55, o.z); b.rotation.set(o.z, o.x, 0.3); b.castShadow = b.receiveShadow = true; scene.add(b);
+    rocks.push({ m: b, r: o.r, x: o.x, y: footGround(o.x, o.z), z: o.z, sink: 0.1 });
   }
   // cliff faces of the chasm + mist + a waterfall
   const face = (z, yTop, flip) => {
@@ -207,7 +211,7 @@ export function buildWorld(scene) {
   const quayLen = FOOT.stepsZ1 - (FOOT.quayZ - 2.5);
   const quay = new THREE.Mesh(new THREE.BoxGeometry(14, 9, quayLen), stoneMat);
   quay.position.set(0, FOOT.stepTop - 4.5, FOOT.stepsZ1 - quayLen / 2); quay.receiveShadow = true; scene.add(quay);
-  for (const [x, z, h] of [[-3.3, -80, 7], [3.4, -88, 9], [-3.1, -96, 10], [3.1, -101, 8], [-3.1, -105.5, 11], [3.1, -105.5, 9], [-5, -114, 8], [5, -114, 10]]) {
+  for (const [x, z, h] of [[-2.35, -80, 7], [2.35, -88, 9], [-3.1, -96, 10], [3.1, -101, 8], [-3.1, -105.5, 11], [3.1, -105.5, 9], [-5, -114, 8], [5, -114, 10]]) {
     const c = crystal(0.75, h); c.position.set(x, footGround(0, z), z); c.rotation.y = x; scene.add(c);
   }
 
@@ -250,10 +254,11 @@ export function buildWorld(scene) {
 
   // banks: rock in the gorge, pale colony stone through the flooded city
   const colony = s => s > 50 && s < RIVER.archS + 20;
+  const bankTop = (s, side) => riverAt(s).y + 7 + 4 * n1(s * 0.2, side) + (colony(s) ? 3 : 6);
   for (const side of [-1, 1]) {
     const rows = [];
     for (let s = -6; s <= endS; s += 2) {
-      const f = riverAt(s), base = f.width / 2 + 0.3, top = f.y + 7 + 4 * n1(s * 0.2, side) + (colony(s) ? 3 : 6), row = [];
+      const f = riverAt(s), base = f.width / 2 + 0.3, top = bankTop(s, side), row = [];
       for (let v = 0; v <= 4; v++) { const o = side * (base + 0.35 * v + 0.5 * n1(s + v * 5, side)); row.push(new THREE.Vector3(f.x + f.nx * o, f.y - 4 + (top - f.y + 4) * v / 4, f.z + f.nz * o)); }
       const o2 = side * (base + 40); row.push(new THREE.Vector3(f.x + f.nx * o2, top + 2, f.z + f.nz * o2));
       rows.push(row);
@@ -276,7 +281,7 @@ export function buildWorld(scene) {
     let m;
     if (o.kind === 'bust') { m = helmetHead(o.r * 1.05); m.position.set(o.x, o.y + o.r * 0.25, o.z); m.rotation.y = Math.atan2(-f.tx, -f.tz) + (o.off > 0 ? -0.3 : 0.3); busts.push({ m, o }); }
     else if (o.kind === 'pillar') { m = crystal(o.r * 0.9, 9 + (o.s % 4)); m.position.set(o.x, o.y - 2, o.z); }
-    else { m = new THREE.Mesh(new THREE.DodecahedronGeometry(o.r * 1.1, 0), std(C.rockDark, { flatShading: true })); m.position.set(o.x, o.y + 0.2, o.z); m.castShadow = true; }
+    else { m = new THREE.Mesh(new THREE.DodecahedronGeometry(o.r * 1.1, 0), std(C.rockDark, { flatShading: true })); m.position.set(o.x, o.y + 0.2, o.z); m.castShadow = true; rocks.push({ m, r: o.r, x: o.x, y: o.y, z: o.z, sink: 0.8 }); }
     scene.add(m);
   }
   // the fallen antenna mast across the river (duck!)
@@ -303,6 +308,7 @@ export function buildWorld(scene) {
     rocket.rotation.set(0.35, Math.atan2(f.tx, f.tz), 1.15);
     rocket.traverse(o => { if (o.isMesh) o.castShadow = true; });
     scene.add(rocket);
+    W.archParts = { arch, rocket, f };
   }
   // the lagoon
   {
@@ -394,6 +400,29 @@ export function buildWorld(scene) {
       a.position.set(f.x + f.nx * o, f.y - 0.6, f.z + f.nz * o);
       a.rotation.y = Math.atan2(-f.tx, -f.tz) + 0.5;                 // dish turned upstream, toward the raft
       g.remove(dish); scene.add(a);
+    }
+    if (P.boulders) for (const o of rocks) {
+      const b = P.boulders.template.clone(true), sz = P.boulders.size, k = (2.4 * o.r) / Math.max(sz.x, sz.z);
+      b.scale.setScalar(k); b.position.set(o.x, o.y - o.sink, o.z); b.rotation.y = o.x * 3 + o.z;
+      scene.add(b); scene.remove(o.m);
+    }
+    if (P.arch && W.archParts) {
+      const { arch, rocket, f } = W.archParts, a = P.arch.template.clone(true);
+      a.position.set(f.x, f.y - 3, f.z); a.rotation.y = Math.atan2(-f.tx, -f.tz);     // opening along the river, rocket upstream
+      scene.add(a); scene.remove(arch, rocket);
+    }
+    if (P.cliff) {                    // rock towers on the canyon rim and along the river banks (skyline silhouettes)
+      const tpl = P.cliff.template, sz = P.cliff.size, rnd = rng(11), half = Math.max(sz.x, sz.z) / 2 / sz.y;
+      const put = (x, y, z, h) => { const c = tpl.clone(true); c.scale.setScalar(h / sz.y); c.position.set(x, y, z); c.rotation.y = rnd() * 6.28; scene.add(c); };
+      for (let z = 36; z > -112; z -= 10) for (const side of [-1, 1]) {
+        if (z < FOOT.edgeZ + 6 && z > FOOT.farZ - 6) continue;                       // the helmets own the chasm rim
+        const h = 7 + rnd() * 8;
+        put(footCenter(z) + side * (wallHalf(z) + 4 + half * h + rnd() * 3), wallTop(z, side) - 1.2, z + rnd() * 4, h);
+      }
+      for (let s = 6; s < RIVER.endS + 30; s += 15) for (const side of [-1, 1]) {
+        const f = riverAt(s), h = 7 + rnd() * 9, o = side * (f.width / 2 + 3.5 + half * h + rnd() * 3);
+        put(f.x + f.nx * o, bankTop(s, side) - 1.5, f.z + f.nz * o, h);
+      }
     }
     if (P.raft) {
       const r = P.raft.template.clone(true);

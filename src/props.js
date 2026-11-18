@@ -12,6 +12,9 @@ export const PROPS = {
   bust: { url: 'assets/models/bust.glb', yaw: 270, scale: 6.6 },                                    // half-sunken river statues
   crystal: { url: 'assets/models/crystal.glb', yaw: 270, scale: 1, glow: 0.22 },                    // scaled per slot (radius, height)
   antenna: { url: 'assets/models/antenna.glb', yaw: 0, scale: 3.9 },                                // dish head by the duck mast
+  cliff: { url: 'assets/models/cliff.glb', yaw: 0, scale: 1 },                                      // rim towers, scaled per instance
+  boulders: { url: 'assets/models/boulders.glb', yaw: 0, scale: 1 },                                // trail boulders + river rocks, per collider
+  arch: { url: 'assets/models/arch.glb', yaw: 270, scale: 38 },                                     // spans the river, rocket upstream
 };
 
 export async function loadProps(names = Object.keys(PROPS)) {
