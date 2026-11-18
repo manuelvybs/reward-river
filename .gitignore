@@ -1,0 +1,4 @@
+art-src/**/*.raw.*
+.DS_Store
+node_modules/
+.omc/
