@@ -1,9 +1,10 @@
 // Twin Moon River — boot, renderer, game loop (fixed 120 Hz physics), overlays, HUD and window.__game.
-//   ?autopilot  plays itself     ?cp=foot:1 | raft:2  start at a checkpoint     ?lowq  no shadows
+//   ?autopilot  plays itself     ?cp=foot:1 | raft:2  start at a checkpoint     ?lowq  no shadows     ?cam=px,py,pz,tx,ty,tz[,fov]
 import * as THREE from 'three';
 import { Player, autopilot } from './player.js';
 import { buildWorld } from './world.js';
 import { loadHero } from './hero.js';
+import { loadProps } from './props.js';
 import { ChaseCamera } from './camera.js';
 import { Input } from './input.js';
 import { PALETTE, GAME, SUN } from './config.js';
@@ -12,6 +13,7 @@ import { MEDALS, RIVER, FOOT } from './level.js';
 const Q = new URLSearchParams(location.search);
 const $ = id => document.getElementById(id);
 const STEP = 1 / 120;
+const DEBUG_CAM = Q.get('cam')?.split(',').map(Number);   // review shots: ?cam=px,py,pz,tx,ty,tz[,fov]
 
 // ------------------------------------------------------------------------------------------ renderer + scene
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -112,6 +114,7 @@ function frame() {
     camera.position.set(player.pos.x + Math.sin(a) * 4.2, player.pos.y + 1.6, player.pos.z + Math.cos(a) * 4.2);
     camera.lookAt(player.pos.x, player.pos.y + 0.8, player.pos.z);
   } else cam.update(paused ? 0 : dt, player);
+  if (DEBUG_CAM) { camera.position.set(DEBUG_CAM[0], DEBUG_CAM[1], DEBUG_CAM[2]); camera.lookAt(DEBUG_CAM[3], DEBUG_CAM[4], DEBUG_CAM[5]); if (DEBUG_CAM[6]) { camera.fov = DEBUG_CAM[6]; camera.updateProjectionMatrix(); } }
 
   world.update(paused ? 0 : dt, t, player, hero, camera);
   sun.position.copy(player.pos).addScaledVector(SUN_DIR, 60);
@@ -128,7 +131,8 @@ window.__game = {
   start: () => start(), restart: () => restart(), autopilot: on => { auto = on; },
 };
 
-loadHero().then(h => {
+Promise.all([loadHero(), loadProps()]).then(([h, props]) => {
+  world.useProps(props);
   hero = h; scene.add(hero.root);
   hero.sync(player, 0);
   renderer.compile(scene, camera);

@@ -58,7 +58,7 @@ class Hero {
 
     const onRaft = p.mode === 'raft' || p.mode === 'end' || (p.mode === 'board' && p.board?.t > 0.9);
     this.root.position.copy(p.pos);
-    if (onRaft) this.root.position.y += 0.32;           // seated on the deck
+    if (onRaft) this.root.position.y += 0.25;           // seated on the raft deck
     qYaw.setFromAxisAngle(UP, p.yaw);
     if (p.mode === 'rope') {                             // hang along the rope: the body's up points at the anchor
       v.copy(FOOT.anchor).sub(p.pos).normalize();

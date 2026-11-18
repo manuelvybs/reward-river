@@ -175,8 +175,9 @@ export function buildWorld(scene) {
   W.anim.push(dt => { fallTex.offset.y += dt * 1.4; });
 
   // the two giant stone helmets facing each other across the chasm
+  const helmets = [];
   for (const side of [-1, 1]) {
-    const h = helmetHead(6.8);
+    const h = helmetHead(6.8); helmets.push(h);
     h.position.set(side * 15.5, 2.5, FOOT.anchor.z + 1.5);
     h.rotation.y = -side * Math.PI / 2 + side * 0.45;
     scene.add(h);
@@ -186,8 +187,9 @@ export function buildWorld(scene) {
   const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-12, -30, -63), new THREE.Vector3(-10, -6, -63.5), new THREE.Vector3(-8, 8, -64.5), new THREE.Vector3(-6.5, 12, -65)]), 20, 1.1, 8), bark);
   const branch = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-7, 11.5, -65), new THREE.Vector3(-3.5, 13.6, -65), FOOT.anchor.clone().add(new THREE.Vector3(0, 0.35, 0)), new THREE.Vector3(1.8, 13.0, -65)]), 24, 0.42, 8), bark);
   trunk.castShadow = branch.castShadow = true; scene.add(trunk, branch);
+  const treeParts = [trunk, branch];
   for (const [x, y, z, r] of [[-7.5, 15.5, -64, 3.6], [-4.5, 15.2, -66.5, 2.6], [-9.5, 13.5, -62, 2.8], [-1.5, 14.6, -64, 2]]) {
-    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), std(C.mossDark, { flatShading: true })); b.position.set(x, y, z); b.castShadow = true; scene.add(b);
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), std(C.mossDark, { flatShading: true })); b.position.set(x, y, z); b.castShadow = true; scene.add(b); treeParts.push(b);
   }
   const pod = new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 14), new THREE.MeshStandardMaterial({ color: C.crystal, emissive: col(C.crystal), emissiveIntensity: 1.2 }));
   pod.position.copy(FOOT.anchor).add(new THREE.Vector3(0, 0.1, 0)); scene.add(pod);
@@ -360,6 +362,27 @@ export function buildWorld(scene) {
       d.copy(FOOT.anchor).sub(hero.hands).multiplyScalar(-k); const len = d.length();
       mid.copy(hero.hands).addScaledVector(d, -0.5);
       rope.position.copy(mid); rope.scale.set(1, len, 1); rope.quaternion.setFromUnitVectors(up, d.normalize());
+    }
+  };
+  // swap the placeholders for the generated props once they have loaded (missing ones keep their placeholder)
+  W.useProps = P => {
+    if (P['helmet-face']) for (const h of helmets) {
+      const m = P['helmet-face'].template.clone(true);
+      m.position.set(h.position.x, -7, h.position.z); m.rotation.copy(h.rotation);
+      scene.add(m); scene.remove(h);
+    }
+    if (P.tree) {
+      const t = P.tree.template.clone(true);
+      t.position.copy(FOOT.anchor).sub(P.tree.points.pod);
+      scene.add(t); treeParts.forEach(o => scene.remove(o));
+      pod.position.copy(FOOT.anchor).add(new THREE.Vector3(0, -0.45, 0)); pod.scale.setScalar(0.75);
+    }
+    if (P.raft) {
+      const r = P.raft.template.clone(true);
+      r.position.y = -0.25;
+      raft.add(r); raft.remove(hull, deck);
+      const hw = P.raft.size.x / 2;
+      oars.forEach((o, k) => o.position.set((k ? 1 : -1) * (hw - 0.05), 0.3, 0.15));
     }
   };
   return W;

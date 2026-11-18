@@ -1,0 +1,8 @@
+{
+  "image_url": "https://v3b.fal.media/files/b/0ab2f761/f1XL5i47w3tQBiwNREyU9_helmet-face-1.png",
+  "geometry_quality": "detailed",
+  "texture": true,
+  "texture_quality": "detailed",
+  "pbr": false,
+  "face_limit": 20000
+}

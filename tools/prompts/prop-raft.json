@@ -1,0 +1,10 @@
+{
+  "image_urls": [
+    "https://v3b.fal.media/files/b/0ab2f5e1/98tG-7Ty5_G--3GUHnNUy_view-front.png"
+  ],
+  "prompt": "A small one-person pod-raft for the astronaut in the reference image, matching its colours: a rounded capsule-shaped inflatable hull in pale icy white-blue (#E6F9FE) with a soft rounded bow and stern, a flat deep-indigo (#3A43C4) deck on top, a lavender (#A8B1E7) stripe around the hull, two simple wooden oarlocks on the sides, a small coiled rope on the deck and a little gold four-point star emblem on the bow. No oars, no character, no water. Seen from the three-quarter top. Stylized 3D game asset in a soft hand-painted look: smooth rounded forms, painted texture with gentle colour variation, no harsh detail. Warm golden-hour light from the upper right. The whole object is centred and fully inside the frame with empty margin around it, three-quarter view, on a plain flat light-grey background (#E9ECEF). No ground, no cast shadow, no other objects, no text, no letters, no watermark.",
+  "aspect_ratio": "1:1",
+  "resolution": "2K",
+  "output_format": "png",
+  "num_images": 2
+}
