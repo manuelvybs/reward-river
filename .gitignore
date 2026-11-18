@@ -2,3 +2,7 @@ art-src/**/*.raw.*
 .DS_Store
 node_modules/
 .omc/
+# heavy intermediates stay local (rebuild with tools/build-hero.sh from the local Meshy outputs)
+art-src/**/*.glb
+art-src/hero/views-sheet-*.png
+art-src/hero/hero-poses.png

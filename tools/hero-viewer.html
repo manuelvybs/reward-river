@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero Viewer</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: linear-gradient(#cfc9f3, #f3eefc); font: 14px/1.3 system-ui, sans-serif; }
+  canvas { display: block; }
+  #ui { position: fixed; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  #ui button { border: 0; border-radius: 8px; padding: 7px 11px; background: #ffffffcc; color: #2b2f7a; cursor: pointer; font-weight: 600; }
+  #ui button.on { background: #3A43C4; color: #fff; }
+  #info { position: fixed; left: 12px; bottom: 10px; color: #2b2f7a; opacity: .8; }
+</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three.module.js", "three/addons/": "../vendor/jsm/" } }</script>
+</head>
+<body>
+<div id="ui"></div>
+<div id="info">loading…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const q = new URLSearchParams(location.search);
+const url = q.get('glb') || '../assets/models/hero.glb';
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.05, 50);
+camera.position.set(0, 0.75, 3.2);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.5, 0);
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xf4f0ff, 0x8f87c9, 1.6));
+const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+sun.position.set(2, 4, 3); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(1.2, 48), new THREE.ShadowMaterial({ opacity: 0.18 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+const pivot = new THREE.Group(); scene.add(pivot);
+let mixer, actions = {}, current, spin = !q.has('nospin');
+const info = document.getElementById('info');
+
+const gltf = await new GLTFLoader().loadAsync(url);
+const model = gltf.scene;
+model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+// scale to 1 m tall, feet on the ground
+const box = new THREE.Box3().setFromObject(model);
+const h = box.max.y - box.min.y; model.scale.setScalar(1 / h);
+const box2 = new THREE.Box3().setFromObject(model); model.position.y -= box2.min.y;
+pivot.add(model);
+
+// ?sheet=idle:1.0,run:0.3,... → a row of frozen poses (one clone per clip at that time), for review images
+if (q.get('sheet') || q.get('grid')) {
+  // ?sheet=idle:1.0,run:0.3,...   one row of frozen poses
+  // ?grid=idle,run,hang&n=6       one row per clip, n poses spread over its duration
+  const { clone } = await import('three/addons/utils/SkeletonUtils.js');
+  pivot.remove(model);
+  const yaw = THREE.MathUtils.degToRad(+(q.get('yaw') ?? 20));
+  let rows;
+  if (q.get('grid')) {
+    const n = +(q.get('n') || 6);
+    rows = q.get('grid').split(',').map(name => { const c = gltf.animations.find(a => a.name === name); const d = c ? c.duration : 1;
+      return Array.from({ length: n }, (_, k) => [name, (k / n) * d]); });
+  } else rows = [q.get('sheet').split(',').map(s => s.split(':'))];
+  const cols = Math.max(...rows.map(r => r.length)), dx = 1.05, dy = 1.25;
+  rows.forEach((row, r) => row.forEach(([name, t], i) => {
+    const c = clone(model); c.rotation.y = yaw;
+    c.position.set((i - (cols - 1) / 2) * dx, ((rows.length - 1) / 2 - r) * dy, 0);
+    const m = new THREE.AnimationMixer(c); const clip = gltf.animations.find(a => a.name === name);
+    if (clip) { m.clipAction(clip).play(); m.setTime(+t || 0); }
+    // root motion would carry poses into their neighbours: pin the hips over the cell
+    const hips = c.getObjectByName('Hips'); if (hips) { hips.position.x = 0; hips.position.z = 0; }
+    scene.add(c);
+    if (i === 0 || q.get('sheet')) { const label = document.createElement('div'); label.textContent = q.get('grid') ? name : name;
+      const fy = rows.length > 1 ? (r + 0.92) / rows.length * 100 : 90, fx = q.get('grid') ? 1.5 : (i + 0.5) / cols * 100;
+      label.style.cssText = `position:fixed;top:${fy}%;left:${fx}%;transform:translate(${q.get('grid') ? '0' : '-50%'},-100%);color:#2b2f7a;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px`;
+      document.body.appendChild(label); }
+  }));
+  ground.visible = false;
+  camera.fov = 22; const halfT = Math.tan(THREE.MathUtils.degToRad(11));
+  const w = cols * dx + 0.3, h = rows.length * dy + 0.2;
+  camera.position.set(0, 0.55, Math.max(w / 2 / (halfT * innerWidth / innerHeight), h / 2 / halfT));
+  controls.target.set(0, 0.55, 0); controls.update(); camera.updateProjectionMatrix();
+  document.getElementById('ui').remove(); document.getElementById('info').remove();
+  renderer.setAnimationLoop(() => renderer.render(scene, camera));
+  window.__viewer = { ready: true, sheet: true };
+} else {
+
+mixer = new THREE.AnimationMixer(model);
+const ui = document.getElementById('ui');
+for (const clip of gltf.animations) {
+  actions[clip.name] = mixer.clipAction(clip);
+  const b = document.createElement('button'); b.textContent = clip.name; b.onclick = () => play(clip.name); ui.appendChild(b);
+}
+const spinBtn = document.createElement('button'); spinBtn.textContent = 'turntable'; spinBtn.onclick = () => { spin = !spin; spinBtn.classList.toggle('on', spin); };
+spinBtn.classList.toggle('on', spin); ui.appendChild(spinBtn);
+
+function play(name) {
+  const next = actions[name]; if (!next) return false;
+  if (current && current !== next) current.fadeOut(0.2);
+  next.reset().fadeIn(0.2).play(); current = next;
+  [...ui.children].forEach(b => b.classList.toggle('on', b.textContent === name || (b === spinBtn && spin)));
+  info.textContent = `${name} · ${next.getClip().duration.toFixed(2)}s · ${gltf.animations.length} clips · ${url}`;
+  return true;
+}
+play(actions.idle ? 'idle' : gltf.animations[0]?.name);
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 1 / 20);
+  if (spin) pivot.rotation.y += dt * 0.6;
+  mixer.update(dt);
+  renderer.render(scene, camera);
+});
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// hooks for scripted review screenshots
+window.__viewer = {
+  ready: true, clips: gltf.animations.map(c => c.name), play, mixer, actions,
+  solo(name, t = 0) { mixer.stopAllAction(); const a = actions[name]; a.reset(); a.setEffectiveWeight(1); a.play(); a.time = t; mixer.update(0); current = a; return a.getEffectiveWeight(); },
+  setYaw(deg) { spin = false; spinBtn.classList.remove('on'); pivot.rotation.y = THREE.MathUtils.degToRad(deg); },
+  seek(t) { if (current) { current.time = t; mixer.update(0); } },
+};
+}
+</script>
+</body>
+</html>

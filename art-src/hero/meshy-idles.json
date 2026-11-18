@@ -1,0 +1,205 @@
+{
+  "rigged_character_glb": {
+    "url": "https://v3b.fal.media/files/b/0ab2f66c/RMFOaRsInon86xKQ8RqNt_rigged_character.glb",
+    "content_type": "model/gltf-binary",
+    "file_name": "rigged_character.glb",
+    "file_size": 3044228
+  },
+  "rigged_character_fbx": {
+    "url": "https://v3b.fal.media/files/b/0ab2f66c/DJI5ifAER6V-KFE75sEoM_rigged_character.fbx",
+    "content_type": "application/vnd.autodesk.fbx",
+    "file_name": "rigged_character.fbx",
+    "file_size": 2997740
+  },
+  "basic_animations": {
+    "walking_glb": {
+      "url": "https://v3b.fal.media/files/b/0ab2f66a/pTTqcqC0nqgMsX0qeIX-C_walking.glb",
+      "content_type": "model/gltf-binary",
+      "file_name": "walking.glb",
+      "file_size": 3024540
+    },
+    "walking_fbx": {
+      "url": "https://v3b.fal.media/files/b/0ab2f66a/vrK74FTJYO4wGmsVG8YaR_walking.fbx",
+      "content_type": "application/vnd.autodesk.fbx",
+      "file_name": "walking.fbx",
+      "file_size": 3033836
+    },
+    "walking_armature_glb": {
+      "url": "https://v3b.fal.media/files/b/0ab2f669/zETzQZ4s6L6KfEn9VFJfm_walking_armature.glb",
+      "content_type": "model/gltf-binary",
+      "file_name": "walking_armature.glb",
+      "file_size": 89976
+    },
+    "running_glb": {
+      "url": "https://v3b.fal.media/files/b/0ab2f66a/0tVANxnwVwKZSSFl1jGjE_running.glb",
+      "content_type": "model/gltf-binary",
+      "file_name": "running.glb",
+      "file_size": 3013928
+    },
+    "running_fbx": {
+      "url": "https://v3b.fal.media/files/b/0ab2f66a/msBjlYv9oF4asqksJi1kB_running.fbx",
+      "content_type": "application/vnd.autodesk.fbx",
+      "file_name": "running.fbx",
+      "file_size": 3016844
+    },
+    "running_armature_glb": {
+      "url": "https://v3b.fal.media/files/b/0ab2f669/VWwGCEf-xyxcGWPhyDH5W_running_armature.glb",
+      "content_type": "model/gltf-binary",
+      "file_name": "running_armature.glb",
+      "file_size": 79352
+    }
+  },
+  "animations": [
+    {
+      "action_id": 11,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f66e/FjMsZ4U15ym4hqTLAjmFN_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3046660
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f66f/OfTuzLG22k0suSVm15erL_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3053804
+      }
+    },
+    {
+      "action_id": 12,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f67d/kQIl-248JXs40Qks0QMtu_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3110436
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f67d/h1dO2yUe1ScuottPb8-Kc_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3124316
+      }
+    },
+    {
+      "action_id": 243,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f685/Tg8RLSbl6cHNYehxZio6U_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3261612
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f685/BWtKk2x-GMkwthYfPB1y5_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3284220
+      }
+    },
+    {
+      "action_id": 244,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f683/uXJbhOUIdNVv6eSLqTeG4_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3367684
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f683/R2VttHn4rsd-XmI7aQxuL_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3392540
+      }
+    },
+    {
+      "action_id": 245,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f672/mVztmSkrcRlehN_wZjkDN_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3045732
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f672/sUcOulhQ7FuFM4S_T9u8N_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3052844
+      }
+    },
+    {
+      "action_id": 246,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f681/9NyZFqiPZ-PtmWHFxvO-D_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3192672
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f682/25S3TVsEW2Ece428OXXqp_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3208700
+      }
+    },
+    {
+      "action_id": 247,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f687/wxOX7Y7x5PQywapmvmnfr_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3228916
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f687/a3a1iPukksU3Wi98XfoQg_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3247420
+      }
+    },
+    {
+      "action_id": 248,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f67f/_JnUNSFqEI8AkqeQB8XcS_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3209436
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f680/_WxJyKTFrnNvEgn67q0-2_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3220940
+      }
+    },
+    {
+      "action_id": 249,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f678/0S4mgmqSuL3WQOw6ln1rT_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3050224
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f679/t4_qdNI_yj0kxUc6ypYr6_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3056780
+      }
+    },
+    {
+      "action_id": 28,
+      "animation_glb": {
+        "url": "https://v3b.fal.media/files/b/0ab2f67a/Ujnm4mT6qF6GqJOFad82i_animation.glb",
+        "content_type": "model/gltf-binary",
+        "file_name": "animation.glb",
+        "file_size": 3138720
+      },
+      "animation_fbx": {
+        "url": "https://v3b.fal.media/files/b/0ab2f67a/g590APKEWoWd8oORaEuOh_animation.fbx",
+        "content_type": "application/vnd.autodesk.fbx",
+        "file_name": "animation.fbx",
+        "file_size": 3155964
+      }
+    }
+  ],
+  "rig_task_id": "01a1eeb8-e001-71a1-993c-7a2cc209d5a5"
+}
