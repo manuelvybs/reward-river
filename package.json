@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tools/*.test.mjs"
+    "test": "node --test tools/*.test.mjs tests/*.test.mjs"
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.2.0",
