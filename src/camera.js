@@ -1,4 +1,4 @@
-// Twin Moon River — chase camera. One rig per mode (config CAMERAS), blended when the mode changes; never under
+// Reward River — chase camera. One rig per mode (config CAMERAS), blended when the mode changes; never under
 // the ground or the water.
 import * as THREE from 'three';
 import { CAMERAS } from './config.js';
@@ -14,7 +14,10 @@ export class ChaseCamera {
     this.pos = new THREE.Vector3();
     this.look = new THREE.Vector3();
     this.dir = new THREE.Vector3(0, 0, -1);
+    this.shakeAmt = 0;
   }
+
+  shake(a) { this.shakeAmt = Math.min(0.6, this.shakeAmt + a); }
 
   rigFor(p) { return p.mode === 'rope' ? CAMERAS.rope : (p.mode === 'raft' || p.mode === 'end' || p.mode === 'board') ? CAMERAS.raft : CAMERAS.foot; }
 
@@ -43,8 +46,13 @@ export class ChaseCamera {
     if (Number.isFinite(g) && this.pos.y < g + 0.8) this.pos.y = g + 0.8;
     if (p.mode === 'raft' || p.mode === 'end') { const f = riverAt(p.raft.s - 6); if (this.pos.y < f.y + 1.2) this.pos.y = f.y + 1.2; }
 
-    this.camera.position.copy(this.pos);
+    this.shakeAmt *= Math.exp(-7 * dt);
+    const sh = this.shakeAmt;
+    this.camera.position.set(this.pos.x + (Math.random() - 0.5) * sh, this.pos.y + (Math.random() - 0.5) * sh, this.pos.z + (Math.random() - 0.5) * sh);
     this.camera.lookAt(this.look);
-    if (Math.abs(this.camera.fov - r.fov) > 0.01) { this.camera.fov = r.fov; this.camera.updateProjectionMatrix(); }
+    // the lens widens a little with raft speed (the rapids feel fast)
+    const fov = r.fov + (p.mode === 'raft' ? Math.min(7, Math.max(0, (p.raft.speed - 5.5) * 0.9)) : 0);
+    this.fovNow = (this.fovNow ?? fov) + (fov - (this.fovNow ?? fov)) * Math.min(1, 2 * dt);
+    if (Math.abs(this.camera.fov - this.fovNow) > 0.01) { this.camera.fov = this.fovNow; this.camera.updateProjectionMatrix(); }
   }
 }

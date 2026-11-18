@@ -1,4 +1,4 @@
-// Twin Moon River — the player: modes, physics, events. Pure logic (runs in Node for tests and in the browser).
+// Reward River — the player: modes, physics, events. Pure logic (runs in Node for tests and in the browser).
 //
 // modes: foot (run the trail / landing / steps) -> air (jump, fall, stumble) -> rope (pendulum under the anchor)
 //        -> board (hop from the quay onto the raft) -> raft (ride the river) -> end (lagoon)

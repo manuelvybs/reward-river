@@ -1,4 +1,4 @@
-// Twin Moon River — painted surfaces: textures, the terrain material, backdrops and sprite atlases.
+// Reward River — painted surfaces: textures, the terrain material, backdrops and sprite atlases.
 // Everything is optional: a texture that fails to load leaves the flat palette colour in place.
 import * as THREE from 'three';
 

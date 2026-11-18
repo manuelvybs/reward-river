@@ -1,4 +1,4 @@
-// Twin Moon River — the course as analytic functions. No scene objects here: this module runs in Node (tests,
+// Reward River — the course as analytic functions. No scene objects here: this module runs in Node (tests,
 // headless autopilot) and in the browser. Forward is -Z. Meters.
 //
 //   canyon trail -> chasm (rope swing between two giant stone helmets) -> landing -> crystal steps -> quay

@@ -1,4 +1,4 @@
-// Twin Moon River — the world, built from level.js. Step 2 greybox: every prop is a placeholder shape in the final
+// Reward River — the world, built from level.js. Step 2 greybox: every prop is a placeholder shape in the final
 // palette, placed where its generated model will go (step 3 swaps them for GLBs).
 import * as THREE from 'three';
 import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS, ROOTS, COLLIDERS } from './level.js';
@@ -79,6 +79,8 @@ function crystal(r, h) {
   const g = new THREE.Group(); g.add(m); CRYSTALS.push({ g, r, h }); return g;
 }
 
+const LAGOON_AHEAD = 20;   // lagoon centre, meters past the end of the course (the raft stops inside the water)
+
 export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} }) {
   const W = { medals: [], anim: [] };
   const T = paint.tex, sm = (t, color, o = {}) => t ? std(0xffffff, { map: t, ...o, color }) : std(color, o);
@@ -90,7 +92,7 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
     fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform vec3 glow; uniform vec3 sunDir; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.6 + 0.08, 0., 1.); vec3 c = mix(bottom, top, pow(h, 0.8)); float s = max(dot(normalize(vP), sunDir), 0.); c += glow * (pow(s, 6.) * 0.35 + pow(s, 60.) * 0.6); c += vec3(1.) * pow(s, 900.) * 1.5; gl_FragColor = vec4(c, 1.);\n#include <colorspace_fragment>\n}',
   }));
-  sky.renderOrder = -10; scene.add(sky);
+  sky.renderOrder = -10; scene.add(sky); W.sky = sky;
   const moonTex = (inner, outer, ring) => canvasTex(256, 256, (x, w, h) => {
     const g = x.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2);
     g.addColorStop(0, inner); g.addColorStop(0.62, outer); g.addColorStop(0.7, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
@@ -256,7 +258,7 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   waterRows.forEach((row, i) => row.forEach((p, j) => uv.push(j / 6 * 2, i / 9)));
   waterGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: flow, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: col(C.water), emissiveIntensity: T.water ? 0.1 : 0.22 }));
-  water.receiveShadow = true; scene.add(water);
+  water.receiveShadow = true; scene.add(water); W.waterMats = [water.material];
   const lagoonFlow = tiled(flow, 8, 8);
   W.anim.push(dt => { flow.offset.y -= dt * 0.55; if (lagoonFlow) lagoonFlow.offset.y -= dt * 0.04; });
 
@@ -294,7 +296,7 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   for (let k = 0; k < 70; k++) {
     const s = 60 + k * 5.2, f = riverAt(s), side = k % 2 ? 1 : -1, o = side * (f.width / 2 + 2 + (k * 7 % 5));
     const h = 3 + (k * 13 % 9), bw = 2 + k % 3, bd = 2 + (k * 5) % 3, b = new THREE.Mesh(boxWorldUV(new THREE.BoxGeometry(bw, h, bd), bw, h, bd, 2.2), k % 4 ? stoneMat : stoneDark);
-    b.position.set(f.x + f.nx * o, f.y + h / 2 + 2.5, f.z + f.nz * o); b.rotation.y = k; b.castShadow = true; scene.add(b);
+    b.position.set(f.x + f.nx * o, f.y + h / 2 + 2.5, f.z + f.nz * o); b.rotation.y = k; b.receiveShadow = true; scene.add(b);
   }
 
   // obstacles: half-sunken helmet statues, crystal pillars, rocks
@@ -335,11 +337,11 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   }
   // the lagoon
   {
-    const f = riverAt(RIVER.endS + 45);
+    const f = riverAt(RIVER.endS + LAGOON_AHEAD);
     const lag = new THREE.Mesh(new THREE.CircleGeometry(48, 48), new THREE.MeshStandardMaterial({ color: T.water ? 0xffffff : C.water, map: lagoonFlow || flowTex, roughness: 0.25, transparent: true, opacity: 0.95, emissive: col(C.water), emissiveIntensity: 0.1 }));
-    lag.rotation.x = -Math.PI / 2; lag.position.set(f.x, f.y - 0.02, f.z); scene.add(lag);
-    const sand = new THREE.Mesh(new THREE.RingGeometry(40, 95, 48), sm(tiled(T.path, 14, 14), T.path ? 0xffffff : C.path)); sand.rotation.x = -Math.PI / 2; sand.position.set(f.x, f.y + 0.35, f.z); sand.receiveShadow = true; scene.add(sand);
-    for (let k = 0; k < 9; k++) { const a = Math.PI * (0.15 + k * 0.09), c = crystal(1.2, 8 + k % 4 * 3); c.position.set(f.x + Math.cos(a) * 44, f.y, f.z - Math.sin(a) * 44); scene.add(c); }
+    lag.rotation.x = -Math.PI / 2; lag.position.set(f.x, f.y - 0.02, f.z); scene.add(lag); W.waterMats.push(lag.material);
+    const sand = new THREE.Mesh(new THREE.RingGeometry(46, 100, 48, 1, THREE.MathUtils.degToRad(310), THREE.MathUtils.degToRad(280)), sm(tiled(T.path, 14, 14), T.path ? 0xffffff : C.path)); sand.rotation.x = -Math.PI / 2; sand.position.set(f.x, f.y + 0.35, f.z); sand.receiveShadow = true; scene.add(sand);
+    for (let k = 0; k < 9; k++) { const a = Math.PI * (0.15 + k * 0.09), c = crystal(1.2, 8 + k % 4 * 3); c.position.set(f.x + Math.cos(a) * 51, f.y + 0.3, f.z - Math.sin(a) * 51); scene.add(c); }
   }
 
   // ------------------------------------------------------------------------------------------ foliage + foam
@@ -364,8 +366,9 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
       const f = riverAt(s), o = side * (f.width / 2 + 1.0 + rnd() * 3.5);
       add(f.x + f.nx * o, bankTop(s, side) + 0.1, f.z + f.nz * o, 1.3 + rnd() * 1.4);
     }
-    const lc = riverAt(RIVER.endS + 45);
-    for (let k = 0; k < 60; k++) { const a = rnd() * Math.PI * 2, d = 41 + rnd() * 14; add(lc.x + Math.cos(a) * d, lc.y + 0.35, lc.z + Math.sin(a) * d, 1 + rnd()); }
+    const lc = riverAt(RIVER.endS + LAGOON_AHEAD);
+    for (let k = 0; k < 60; k++) { const a = rnd() * Math.PI * 2, d = 48 + rnd() * 14; if (Math.sin(a) > 0.62) continue;   // not in the river mouth
+      add(lc.x + Math.cos(a) * d, lc.y + 0.35, lc.z + Math.sin(a) * d, 1 + rnd()); }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     KINDS.forEach((k, i) => {
       const mat = new THREE.MeshStandardMaterial({ map: atlas, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1,
@@ -486,8 +489,8 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
       scene.add(a); scene.remove(arch, rocket);
     }
     if (P.cliff) {                    // rock towers on the canyon rim and along the river banks (skyline silhouettes)
-      const tpl = P.cliff.template, sz = P.cliff.size, rnd = rng(11), half = Math.max(sz.x, sz.z) / 2 / sz.y;
-      const put = (x, y, z, h) => { const c = tpl.clone(true); c.scale.setScalar(h / sz.y); c.position.set(x, y, z); c.rotation.y = rnd() * 6.28; scene.add(c); };
+      const tpl = P.cliff.template, sz = P.cliff.size, rnd = rng(11), half = Math.max(sz.x, sz.z) / 2 / sz.y, mats = [];
+      const put = (x, y, z, h) => mats.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.28), new THREE.Vector3().setScalar(h / sz.y)));
       for (let z = 36; z > -112; z -= 10) for (const side of [-1, 1]) {
         if (z < FOOT.edgeZ + 6 && z > FOOT.farZ - 6) continue;                       // the helmets own the chasm rim
         const h = 7 + rnd() * 8;
@@ -497,6 +500,15 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
         const f = riverAt(s), h = 7 + rnd() * 9, o = side * (f.width / 2 + 3.5 + half * h + rnd() * 3);
         put(f.x + f.nx * o, bankTop(s, side) - 1.5, f.z + f.nz * o, h);
       }
+      // one instanced draw per mesh of the template instead of ~90 clones (no shadows: they stand on the far rims)
+      tpl.updateMatrixWorld(true);
+      tpl.traverse(o => {
+        if (!o.isMesh) return;
+        const im = new THREE.InstancedMesh(o.geometry, o.material, mats.length), m = new THREE.Matrix4();
+        mats.forEach((t, i) => im.setMatrixAt(i, m.multiplyMatrices(t, o.matrixWorld)));
+        im.receiveShadow = true; im.castShadow = false; im.computeBoundingSphere(); scene.add(im);
+      });
+      W.cliffCount = mats.length;
     }
     if (P.raft) {
       const r = P.raft.template.clone(true);

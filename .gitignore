@@ -10,3 +10,6 @@ tools/playtest/
 art-src/props/*.png
 art-src/paint/*.png
 art-src/audio/raw/*.mp3
+art-src/film/*.mp4
+art-src/film/video/
+art-src/film/*.png

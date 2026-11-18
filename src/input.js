@@ -1,4 +1,4 @@
-// Twin Moon River — keyboard + gamepad + touch merged into one input sample per frame.
+// Reward River — keyboard + gamepad + touch merged into one input sample per frame.
 //   sample() -> { up, down, left, right, jump, jumpPressed, start, pause, restart, touch }
 // jumpPressed / start / pause / restart are edges: true for one sample only.
 export class Input {

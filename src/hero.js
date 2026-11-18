@@ -1,4 +1,4 @@
-// Twin Moon River — the rigged astronaut: loads the GLB, crossfades to the player's animation, places it in the
+// Reward River — the rigged astronaut: loads the GLB, crossfades to the player's animation, places it in the
 // world and layers the procedural bits the clips don't have (rope tilt, rowing arms, ducking).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';

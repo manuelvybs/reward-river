@@ -1,4 +1,4 @@
-// Twin Moon River — generated props (Tripo GLBs). Each spec says how to turn the raw model to face +Z, how to scale
+// Reward River — generated props (Tripo GLBs). Each spec says how to turn the raw model to face +Z, how to scale
 // Tripo's unit box to meters, and named points measured on the raw model (tools/prop-tool.mjs measure), which come
 // back in the prop's local space. A template's origin is the bottom centre of its footprint.
 import * as THREE from 'three';

@@ -1,4 +1,4 @@
-// Twin Moon River — sound. WebAudio, started by the first key / tap / pad press (browsers block audio before that).
+// Reward River — sound. WebAudio, started by the first key / tap / pad press (browsers block audio before that).
 //   one-shots: play(name, vol, rate)     loops: loop(name, vol, rate) every frame (smoothed), vol 0 = silent
 //   music: music(name) crossfades        mute(): toggles the master
 export const ONESHOTS = ['steps', 'step_stone', 'jump', 'land', 'stumble', 'rope_throw', 'swing_whoosh', 'paddle', 'bump',
@@ -27,8 +27,8 @@ export class Sound {
     this.bus = ctx.createGain(); this.bus.gain.value = 0.38; this.bus.connect(this.master);
     const load = async n => {
       try {
-        const r = await fetch(`${this.base}${n}.mp3`);
-        if (!r.ok) throw new Error(`${r.status}`);
+        const get = () => fetch(`${this.base}${n}.mp3`).then(r => { if (!r.ok) throw new Error(`${r.status}`); return r; });
+        const r = await get().catch(() => new Promise(res => setTimeout(res, 400)).then(get));   // one retry
         this.buf[n] = await ctx.decodeAudioData(await r.arrayBuffer());
       } catch (e) { this.errors.push(`${n}: ${e.message}`); console.warn('sound missing', n, e.message); }
     };

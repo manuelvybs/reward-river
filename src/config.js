@@ -1,4 +1,4 @@
-// Twin Moon River — every tuning number, colour, camera and string lives here.
+// Reward River — every tuning number, colour, camera and string lives here.
 
 // gameplay tuning (meters, seconds)
 export const TUNING = {
@@ -43,8 +43,8 @@ export const HERO = {
 };
 
 export const GAME = {
-  title: 'Twin Moon River',
-  subtitle: 'run the canyon · swing the chasm · ride the river',
+  title: 'Reward River',
+  subtitle: 'run the canyon · swing the chasm · ride the river · collect your rewards',
   controls: '↑ / W run and row · ↓ / S back, brake · ← → steer · Space jump, throw the rope (or hold it), let go · hold Space on the raft to duck · Enter start · P pause · M sound',
   controlsTouch: 'drag to steer · tap: jump, throw the rope, let go · hold on the raft: duck',
 };

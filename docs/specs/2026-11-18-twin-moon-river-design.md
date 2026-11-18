@@ -1,6 +1,6 @@
-# Twin Moon River — design
+# Reward River (working title: Twin Moon River) — design
 
-Approved by Manuel 2026-11-18.
+Approved by Manuel 2026-11-18. Renamed **Reward River** the same day (Manuel: more aligned with the VYBS brand, play games / earn rewards). The local folder keeps the working name.
 
 A browser game starring the VYBS astronaut. It keeps the gameplay beats of the fal showcase game
 "Saffron River" (https://fal-video-to-game.vercel.app/saffron-river/), but the code is our own and
@@ -81,7 +81,7 @@ Failing (falling into the chasm, hitting obstacles hard) respawns at the last ch
 4. Textures, backdrops, atlases
 5. Sound and music
 6. Polish and scripted playtest (whole level by keyboard, 0 console errors, screenshots at each beat)
-7. Deploy: public repo `manuelvybs/twin-moon-river`, GitHub Pages from `main` → `https://manuelvybs.github.io/twin-moon-river/` (ask before pushing)
+7. Deploy: public repo `manuelvybs/reward-river`, GitHub Pages from `main` → `https://manuelvybs.github.io/reward-river/` (ask before pushing)
 
 ## Budget
 
