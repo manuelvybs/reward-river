@@ -65,12 +65,13 @@ function helmetHead(r, stone = true) {
   return g;
 }
 
+const CRYSTALS = [];   // every crystal placeholder (slot for the generated crystal): { g, r, h }
 function crystal(r, h) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r, h, 6, 1), std(C.crystal, { flatShading: true, roughness: 0.25, emissive: col(C.crystalDeep), emissiveIntensity: 0.25, transparent: true, opacity: 0.93 }));
   m.castShadow = true; m.position.y = h / 2;
   const tip = new THREE.Mesh(new THREE.ConeGeometry(r * 0.8, r * 1.6, 6), m.material);
   tip.position.y = h / 2 + r * 0.8; m.add(tip);
-  const g = new THREE.Group(); g.add(m); return g;
+  const g = new THREE.Group(); g.add(m); CRYSTALS.push({ g, r, h }); return g;
 }
 
 export function buildWorld(scene) {
@@ -269,20 +270,21 @@ export function buildWorld(scene) {
   }
 
   // obstacles: half-sunken helmet statues, crystal pillars, rocks
+  const busts = [];
   for (const o of OBSTACLES) {
     const f = riverAt(o.s);
     let m;
-    if (o.kind === 'bust') { m = helmetHead(o.r * 1.05); m.position.set(o.x, o.y + o.r * 0.25, o.z); m.rotation.y = Math.atan2(-f.tx, -f.tz) + (o.off > 0 ? -0.3 : 0.3); }
+    if (o.kind === 'bust') { m = helmetHead(o.r * 1.05); m.position.set(o.x, o.y + o.r * 0.25, o.z); m.rotation.y = Math.atan2(-f.tx, -f.tz) + (o.off > 0 ? -0.3 : 0.3); busts.push({ m, o }); }
     else if (o.kind === 'pillar') { m = crystal(o.r * 0.9, 9 + (o.s % 4)); m.position.set(o.x, o.y - 2, o.z); }
     else { m = new THREE.Mesh(new THREE.DodecahedronGeometry(o.r * 1.1, 0), std(C.rockDark, { flatShading: true })); m.position.set(o.x, o.y + 0.2, o.z); m.castShadow = true; }
     scene.add(m);
   }
   // the fallen antenna mast across the river (duck!)
   {
-    const f = riverAt(RIVER.beamS), len = f.width + 8, g = new THREE.Group();
+    const f = riverAt(RIVER.beamS), len = f.width + 1.2, g = new THREE.Group();
     for (let k = 0; k < 8; k++) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, len / 8, 12), std(k % 2 ? 0xffffff : C.vybs, { roughness: 0.5 })); seg.position.y = -len / 2 + (k + 0.5) * len / 8; seg.castShadow = true; g.add(seg); }
     const dish = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.2, 24, 1, true), std(0xf4f4ff, { side: THREE.DoubleSide, roughness: 0.4 }));
-    dish.position.y = len / 2; dish.rotation.x = Math.PI; g.add(dish);
+    dish.position.y = len / 2; dish.rotation.x = Math.PI; g.add(dish); W.beam = { g, dish, f };
     g.position.set(f.x, f.y + 1.28, f.z);
     g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(f.nx, 0, f.nz));
     scene.add(g);
@@ -376,6 +378,22 @@ export function buildWorld(scene) {
       t.position.copy(FOOT.anchor).sub(P.tree.points.pod);
       scene.add(t); treeParts.forEach(o => scene.remove(o));
       pod.position.copy(FOOT.anchor).add(new THREE.Vector3(0, -0.45, 0)); pod.scale.setScalar(0.75);
+    }
+    if (P.crystal) for (const { g, r, h } of CRYSTALS) {
+      const c = P.crystal.template.clone(true), sz = P.crystal.size, sxz = (2.2 * r) / Math.max(sz.x, sz.z);
+      c.scale.set(sxz, h / sz.y, sxz); c.position.copy(g.position); c.rotation.y = g.rotation.y;
+      scene.add(c); scene.remove(g);
+    }
+    if (P.bust) for (const { m, o } of busts) {
+      const b = P.bust.template.clone(true);
+      b.position.set(o.x, o.y - 2.4, o.z); b.rotation.y = m.rotation.y;
+      scene.add(b); scene.remove(m);
+    }
+    if (P.antenna && W.beam) {
+      const { g, dish, f } = W.beam, a = P.antenna.template.clone(true), o = f.width / 2 + 0.6;
+      a.position.set(f.x + f.nx * o, f.y - 0.6, f.z + f.nz * o);
+      a.rotation.y = Math.atan2(-f.tx, -f.tz) + 0.5;                 // dish turned upstream, toward the raft
+      g.remove(dish); scene.add(a);
     }
     if (P.raft) {
       const r = P.raft.template.clone(true);

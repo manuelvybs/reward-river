@@ -1,0 +1,11 @@
+{
+  "image_urls": [
+    "https://v3b.fal.media/files/b/0ab2f3c4/XLGjPZDEsCS4SrDHH2oqv_astronaut_ref_turnaround.png",
+    "https://v3b.fal.media/files/b/0ab2f5e1/98tG-7Ty5_G--3GUHnNUy_view-front.png"
+  ],
+  "prompt": "An ancient stone statue bust of the astronaut in the reference images, broken off at mid-chest: the oversized round helmet with its large rounded-rectangle visor, the collar ring, the top of the chubby torso with the rounded-square chest panel carved in relief, and the stubby shoulders. Weathered warm sandstone (terracotta, ochre and cream) with cracks, chipped edges and moss patches; the visor is inlaid deep-indigo stone (#3A43C4) with one carved white four-point sparkle and one small gold sparkle, and NO face. The bottom is a rough broken edge, as if the rest of the statue is sunk below. Seen from the three-quarter front. Stylized 3D game asset in a soft hand-painted look: smooth rounded forms, painted texture with gentle colour variation, no harsh detail. Warm golden-hour light from the upper right. The whole object is centred and fully inside the frame with empty margin around it, three-quarter view, on a plain flat light-grey background (#E9ECEF). No ground, no water, no cast shadow, no other objects, no text, no letters, no watermark.",
+  "aspect_ratio": "1:1",
+  "resolution": "2K",
+  "output_format": "png",
+  "num_images": 2
+}

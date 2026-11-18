@@ -1,0 +1,26 @@
+{
+  "model_mesh": {
+    "url": "https://v3b.fal.media/files/b/0ab2f7f5/99pfB-NwwAhGQ8kPgDlU5_model.glb",
+    "content_type": "model/gltf-binary",
+    "file_name": "model.glb",
+    "file_size": 2254768
+  },
+  "model_urls": {
+    "glb": {
+      "url": "https://v3b.fal.media/files/b/0ab2f7f5/99pfB-NwwAhGQ8kPgDlU5_model.glb",
+      "content_type": "model/gltf-binary",
+      "file_name": "model.glb",
+      "file_size": 2254768
+    },
+    "fbx": null,
+    "base_model": null,
+    "pbr_model": null
+  },
+  "rendered_image": {
+    "url": "https://v3b.fal.media/files/b/0ab2f7f5/6Vqlij7UDpbqa6mZ3ucyo_preview.png",
+    "content_type": "image/png",
+    "file_name": "preview.png",
+    "file_size": 157652
+  },
+  "task_id": "575eb8b9-d678-46ee-98da-39b33619e6d6"
+}

@@ -9,6 +9,9 @@ export const PROPS = {
   'helmet-face': { url: 'assets/models/helmet-face.glb', yaw: 227, scale: 16.3 },                  // the two chasm statues
   tree: { url: 'assets/models/tree.glb', yaw: 270, scale: 15.8, points: { pod: [-0.041, 0.012, -0.407] } },   // branch to +X, pod = rope hook
   raft: { url: 'assets/models/raft.glb', yaw: 270, scale: 2.6 },                                   // bow to +Z
+  bust: { url: 'assets/models/bust.glb', yaw: 270, scale: 6.6 },                                    // half-sunken river statues
+  crystal: { url: 'assets/models/crystal.glb', yaw: 270, scale: 1, glow: 0.22 },                    // scaled per slot (radius, height)
+  antenna: { url: 'assets/models/antenna.glb', yaw: 0, scale: 3.9 },                                // dish head by the duck mast
 };
 
 export async function loadProps(names = Object.keys(PROPS)) {
@@ -18,7 +21,11 @@ export async function loadProps(names = Object.keys(PROPS)) {
     const spec = PROPS[name];
     try {
       const gltf = await loader.loadAsync(spec.url);
-      gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      gltf.scene.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = true; o.receiveShadow = true;
+        if (spec.glow && o.material.map) { o.material.emissive.set(0xffffff); o.material.emissiveMap = o.material.map; o.material.emissiveIntensity = spec.glow; }
+      });
       const turn = new THREE.Group();
       turn.rotation.y = THREE.MathUtils.degToRad(spec.yaw);
       turn.scale.setScalar(spec.scale);
