@@ -1,0 +1,6 @@
+{
+  "prompt": "A short triumphant celebratory ending for a cute adventure game: warm strings and marimba swell into a joyful flute melody and resolve on a gentle final chord, sunset glow. Instrumental only, no vocals.",
+  "music_length_ms": 28000,
+  "force_instrumental": true,
+  "output_format": "mp3_44100_128"
+}

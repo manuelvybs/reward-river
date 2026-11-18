@@ -17,6 +17,7 @@ export class Input {
           if (k === 'Enter') this.edges.add('start');
           if (k === 'KeyP' || k === 'Escape') this.edges.add('pause');
           if (k === 'KeyR') this.edges.add('restart');
+          if (k === 'KeyM') this.edges.add('mute');
         }
         this.keys.add(k);
       } else this.keys.delete(k);
@@ -53,7 +54,7 @@ export class Input {
       right: k.has('ArrowRight') || k.has('KeyD'),
       down: k.has('ArrowDown') || k.has('KeyS'),
       jump: k.has('Space'),
-      jumpPressed: this.edges.has('jump'), start: this.edges.has('start'), pause: this.edges.has('pause'), restart: this.edges.has('restart'),
+      jumpPressed: this.edges.has('jump'), start: this.edges.has('start'), pause: this.edges.has('pause'), restart: this.edges.has('restart'), mute: this.edges.has('mute'),
       touch: this.touchMode,
     };
     this.edges.clear();

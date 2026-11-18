@@ -1,0 +1,6 @@
+{
+  "prompt": "Warm adventurous instrumental for a cute exploration game: plucked strings, marimba, light hand percussion and a soft wooden flute melody, golden-hour desert canyon mood, curious and uplifting, medium tempo around 100 BPM, ends so it loops back to its start. Instrumental only, no vocals.",
+  "music_length_ms": 90000,
+  "force_instrumental": true,
+  "output_format": "mp3_44100_128"
+}

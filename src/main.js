@@ -8,6 +8,7 @@ import { loadProps } from './props.js';
 import { loadPaint } from './paint.js';
 import { ChaseCamera } from './camera.js';
 import { Input } from './input.js';
+import { Sound } from './audio.js';
 import { PALETTE, GAME, SUN } from './config.js';
 import { MEDALS, RIVER, FOOT } from './level.js';
 
@@ -41,7 +42,9 @@ const world = buildWorld(scene, await loadPaint());
 const input = new Input(renderer.domElement);
 const cam = new ChaseCamera(camera);
 const player = new Player();
+const sound = new Sound();
 let hero = null;
+for (const ev of ['keydown', 'pointerdown', 'gamepadconnected']) addEventListener(ev, () => sound.start());   // audio needs a gesture
 
 // ------------------------------------------------------------------------------------------ UI
 $('gameTitle').textContent = GAME.title;
@@ -54,7 +57,21 @@ let state = 'loading', paused = false, auto = Q.has('autopilot'), acc = 0, t = 0
 function setMedals() { $('medalCount').textContent = player.medals.size; }
 function fade() { const f = $('fade'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 380); }
 
+const SFX = {
+  jump: () => sound.play('jump', 0.55, 0.95 + Math.random() * 0.1),
+  land: d => sound.play('land', Math.min(0.9, 0.3 + (d?.airTime || 0) * 0.5)),
+  stumble: () => sound.play('stumble', 0.9),
+  throw: () => sound.play('rope_throw', 0.8),
+  release: () => sound.play('swing_whoosh', 0.8),
+  collect: () => sound.play('collect', 0.55, 1 + (player.medals.size % 5) * 0.05),
+  respawn: () => sound.play('respawn', 0.6),
+  board: () => sound.play('board', 0.8),
+  bump: () => sound.play('bump', 0.9, 0.9 + Math.random() * 0.2),
+  beamHit: () => sound.play('beam_hit', 0.9),
+  splash: d => sound.play('splash_big', Math.min(1, -(d?.v || 6) / 10)),
+};
 player.onEvent = (e, d) => {
+  SFX[e]?.(d);
   if (e === 'collect') { world.collect(d); setMedals(); }
   if (e === 'respawn') { fade(); setTimeout(() => cam.update(1 / 60, player, true), 200); }
   if (e === 'end') endGame(d);
@@ -91,10 +108,11 @@ function frame() {
   if (state === 'title' && inp.start) start();
   else if (state === 'end' && (inp.restart || inp.start)) restart();
   else if (state === 'play') {
-    if (inp.pause) { paused = !paused; show('pause', paused); }
+    if (inp.pause) { paused = !paused; show('pause', paused); if (sound.ctx) paused ? sound.ctx.suspend() : sound.ctx.resume(); }
     if (inp.restart) restart();
   }
 
+  if (inp.mute) sound.mute();
   if (state === 'play' && !paused) {
     acc += dt;
     let first = true;
@@ -118,16 +136,41 @@ function frame() {
   if (DEBUG_CAM) { camera.position.set(DEBUG_CAM[0], DEBUG_CAM[1], DEBUG_CAM[2]); camera.lookAt(DEBUG_CAM[3], DEBUG_CAM[4], DEBUG_CAM[5]); if (DEBUG_CAM[6]) { camera.fov = DEBUG_CAM[6]; camera.updateProjectionMatrix(); } }
 
   world.update(paused ? 0 : dt, t, player, hero, camera);
+  if (!paused) updateSound(dt);
   sun.position.copy(player.pos).addScaledVector(SUN_DIR, 60);
   sun.target.position.copy(player.pos);
   renderer.render(scene, camera);
+}
+
+// ------------------------------------------------------------------------------------------ sound beds, steps, strokes
+let stepT = 0, paddleT = 0, wasDuck = false;
+function updateSound(dt) {
+  if (!sound.ready) return;
+  const p = player, onRiver = p.mode === 'raft' || p.mode === 'end' || p.mode === 'board';
+  sound.music(state === 'end' || p.mode === 'end' ? 'music_end' : onRiver ? 'music_river' : 'music_canyon');
+  const toFall = Math.hypot(p.pos.x + 10.6, p.pos.z + 61);
+  let rap = 0;
+  if (onRiver) for (const sd of RIVER.drops) rap = Math.max(rap, 1 - Math.abs(p.raft.s - sd) / 40);
+  sound.loop('canyon', onRiver ? 0 : 0.45);
+  sound.loop('waterfall', onRiver ? 0 : Math.max(0, 1 - toFall / 55) * 0.9);
+  sound.loop('rope_creak', p.mode === 'rope' ? 0.7 : 0, 0.9 + Math.min(0.3, p.vel.length() / 30));
+  sound.loop('river', onRiver ? 0.55 * (1 - rap * 0.6) : 0);
+  sound.loop('rapids', onRiver ? rap * 0.85 : 0);
+  sound.loop('raft_creak', p.mode === 'raft' ? 0.35 : 0);
+  if (p.mode === 'foot' && Math.abs(p.speed) > 0.6) {                // a step every ~1.5 m
+    stepT -= dt * Math.abs(p.speed);
+    if (stepT <= 0) { stepT = 1.55; const stone = p.pos.z < FOOT.stepsZ0 + 0.5 && p.pos.z > FOOT.quayZ - 3; sound.play(stone ? 'step_stone' : 'steps', 0.35 + 0.2 * Math.random(), 0.9 + Math.random() * 0.2); }
+  } else stepT = 0;
+  if (p.mode === 'raft' && p.raft.rowing) { paddleT -= dt; if (paddleT <= 0) { paddleT = 2 * Math.PI / 7; sound.play('paddle', 0.5, 0.9 + Math.random() * 0.2); } } else paddleT = 0.15;   // in step with the oars
+  if (p.mode === 'raft' && p.raft.duck && !wasDuck) sound.play('duck', 0.6);
+  wasDuck = p.mode === 'raft' && p.raft.duck;
 }
 
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 // ------------------------------------------------------------------------------------------ boot
 window.__game = {
-  ready: false, player, world, scene, camera, level: { beamS: RIVER.beamS, archS: RIVER.archS, endS: RIVER.endS, edgeZ: FOOT.edgeZ, farZ: FOOT.farZ },
+  ready: false, player, world, scene, camera, sound, level: { beamS: RIVER.beamS, archS: RIVER.archS, endS: RIVER.endS, edgeZ: FOOT.edgeZ, farZ: FOOT.farZ },
   state: () => ({ state, mode: player.mode, z: +player.pos.z.toFixed(2), y: +player.pos.y.toFixed(2), s: +player.raft.s.toFixed(1), medals: player.medals.size, respawns: player.respawns, time: +player.time.toFixed(1), checkpoint: player.checkpoint }),
   start: () => start(), restart: () => restart(), autopilot: on => { auto = on; },
 };

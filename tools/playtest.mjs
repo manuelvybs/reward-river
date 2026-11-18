@@ -6,7 +6,7 @@ import fs from 'node:fs';
 const base = process.argv[2] || 'http://localhost:4173/index.html';
 const out = process.argv[3] || 'tools/playtest';
 fs.mkdirSync(out, { recursive: true });
-const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('console', m => m.type() === 'error' && errors.push('console: ' + m.text()));
@@ -19,6 +19,10 @@ const t0 = Date.now();
 await page.goto(base + (base.includes('?') ? '&' : '?') + 'autopilot');
 await page.waitForFunction(() => window.__game?.ready, null, { timeout: 30000 });
 const L = await page.evaluate(() => window.__game.level);
+await page.evaluate(() => window.__game.sound.start());
+const audio = await page.evaluate(() => ({ loaded: Object.keys(window.__game.sound.buf).length, errors: window.__game.sound.errors }));
+console.log(`audio: ${audio.loaded} sounds decoded${audio.errors.length ? ', errors: ' + audio.errors.join(', ') : ''}`);
+if (audio.errors.length) errors.push(...audio.errors.map(e => 'audio: ' + e));
 const beats = [
   ['title', s => true],
   ['trail', s => s.mode === 'foot' && s.z < -8],

@@ -1,0 +1,6 @@
+{
+  "prompt": "Upbeat playful instrumental for a river-rafting adventure in a cute game: driving hand drums and shakers, bright marimba and pizzicato strings, a cheerful flute lead, a sense of speed and fun, about 120 BPM, ends so it loops back to its start. Instrumental only, no vocals.",
+  "music_length_ms": 120000,
+  "force_instrumental": true,
+  "output_format": "mp3_44100_128"
+}

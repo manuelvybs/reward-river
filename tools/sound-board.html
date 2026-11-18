@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sound Board</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg: #fff3e2; --card: #ffffff; --ink: #3a2416; --muted: #8a6a52; --accent: #d9734a; --line: #f0dcc4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; padding: 24px 16px 48px; }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 22px; color: var(--muted); }
+  h2 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 26px 0 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .card b { display: block; margin-bottom: 2px; }
+  .card small { display: block; color: var(--muted); margin-bottom: 8px; min-height: 2.6em; }
+  audio { width: 100%; height: 34px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Twin Moon River · sound board</h1>
+<p class="sub">Every sound in the game, as shipped (loudness-matched). Loops repeat; music tracks loop in the game except the ending.</p>
+<div id="out"></div>
+</main>
+<script>
+const groups = {
+  'One-shots': {
+    steps: 'footstep on the sandy trail', step_stone: 'footstep on the stone steps and quay', jump: 'jump', land: 'landing (louder after a long fall)',
+    stumble: 'tripping on a root', rope_throw: 'throwing the rope at the branch', swing_whoosh: 'letting go of the rope', board: 'hopping into the raft',
+    paddle: 'oar stroke (in time with the oars)', bump: 'raft hits a rock or bank', duck: 'ducking under the antenna', beam_hit: 'hitting the antenna (not ducking)',
+    splash_big: 'landing after a rapids drop', collect: 'collecting a star', respawn: 'back at a checkpoint',
+  },
+  'Ambience loops': {
+    canyon: 'warm canyon wind and alien birds (on foot)', waterfall: 'the chasm waterfall (louder as you get close)', rope_creak: 'rope creaking while you hang',
+    river: 'calm river (on the raft)', rapids: 'white water near the three drops', raft_creak: 'the raft squeaking and bobbing',
+  },
+  'Music': { music_canyon: 'canyon (title and on foot)', music_river: 'river (on the raft)', music_end: 'ending (lagoon, plays once)' },
+};
+document.getElementById('out').innerHTML = Object.entries(groups).map(([g, items]) =>
+  `<h2>${g}</h2><div class="grid">${Object.entries(items).map(([n, d]) =>
+    `<div class="card"><b>${n}</b><small>${d}</small><audio controls preload="none" ${g !== 'One-shots' && n !== 'music_end' ? 'loop' : ''} src="../assets/audio/${n}.mp3"></audio></div>`).join('')}</div>`).join('');
+</script>
+</body>
+</html>
