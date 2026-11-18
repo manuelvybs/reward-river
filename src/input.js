@@ -1,5 +1,5 @@
 // Twin Moon River — keyboard + gamepad + touch merged into one input sample per frame.
-//   sample() -> { up, left, right, jump, jumpPressed, start, pause, restart, touch }
+//   sample() -> { up, down, left, right, jump, jumpPressed, start, pause, restart, touch }
 // jumpPressed / start / pause / restart are edges: true for one sample only.
 export class Input {
   constructor(el) {
@@ -51,6 +51,7 @@ export class Input {
       up: k.has('ArrowUp') || k.has('KeyW'),
       left: k.has('ArrowLeft') || k.has('KeyA'),
       right: k.has('ArrowRight') || k.has('KeyD'),
+      down: k.has('ArrowDown') || k.has('KeyS'),
       jump: k.has('Space'),
       jumpPressed: this.edges.has('jump'), start: this.edges.has('start'), pause: this.edges.has('pause'), restart: this.edges.has('restart'),
       touch: this.touchMode,
@@ -64,6 +65,7 @@ export class Input {
       s.up ||= ay < -0.4 || b(12) || b(7);
       s.left ||= ax < -0.35 || b(14);
       s.right ||= ax > 0.35 || b(15);
+      s.down ||= ay > 0.4 || b(13) || b(6);
       s.jump ||= b(0);
       s.jumpPressed ||= edge(0);
       s.start ||= edge(9) || edge(0);

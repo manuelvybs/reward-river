@@ -6,7 +6,7 @@ import { buildWorld } from './world.js';
 import { loadHero } from './hero.js';
 import { ChaseCamera } from './camera.js';
 import { Input } from './input.js';
-import { PALETTE, GAME } from './config.js';
+import { PALETTE, GAME, SUN } from './config.js';
 import { MEDALS, RIVER, FOOT } from './level.js';
 
 const Q = new URLSearchParams(location.search);
@@ -25,14 +25,14 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(PALETTE.fog, 40, 520);
 const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 3000);
-scene.add(new THREE.HemisphereLight(PALETTE.hemiSky, PALETTE.hemiGround, 1.5));
-const sun = new THREE.DirectionalLight(PALETTE.sun, 2.3);
+scene.add(new THREE.HemisphereLight(PALETTE.hemiSky, PALETTE.hemiGround, 1.65));
+const sun = new THREE.DirectionalLight(PALETTE.sun, SUN.intensity);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 140 });
 sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
-const SUN_DIR = new THREE.Vector3(-0.45, 0.8, 0.35).normalize();
+const SUN_DIR = new THREE.Vector3(...SUN.dir).normalize();
 
 const world = buildWorld(scene);
 const input = new Input(renderer.domElement);

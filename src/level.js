@@ -94,12 +94,18 @@ const OB = [
 export const OBSTACLES = OB.map(([z, off, r, kind]) => { const s = sAtZ(z); const f = riverAt(s);
   return { s, off, r, kind, x: f.x + f.nx * off, z: f.z + f.nz * off, y: f.y }; });
 
-// gold star medals
-const M_FOOT = [[1.2, 8], [-1.4, -4], [1.4, -16], [-1.2, -27], [1.0, -37], [-0.8, -47]];
+// roots across the trail (x0..x1 relative to the trail centre, h above the ground): jump them or stumble back
+export const ROOTS = [{ z: -8, x0: -3.4, x1: 3.4, h: 0.5 }, { z: -31, x0: -3.4, x1: 0.7, h: 0.55 }, { z: -45, x0: -3.2, x1: 3.2, h: 0.5 },
+  { z: -86, x0: -2.8, x1: 2.8, h: 0.45 }];
+// round colliders on foot: boulders to run around
+export const COLLIDERS = [{ x: footCenter(-19) + 1.7, z: -19, r: 0.9 }, { x: footCenter(-38) - 1.6, z: -38, r: 1.0 }, { x: -1.3, z: -90.5, r: 0.8 }];
+
+// gold star medals (x from the trail centre, z, extra height: the one over the first root needs a jump)
+const M_FOOT = [[1.2, 8], [0, -8, 0.9], [1.4, -14], [-1.2, -25], [1.0, -36], [-0.8, -49]];
 const M_RIVER = [[-2, -140], [3, -185], [-4, -222], [4, -256], [-3, -300], [2, -334], [-4, -358], [4, -390], [0, -414],
   [-3, -440], [2, -466], [-3, -497], [3, -522], [-2, -556], [0, -588]];
 export const MEDALS = [
-  ...M_FOOT.map(([x, z]) => ({ x: footCenter(z) + x, y: footGround(footCenter(z) + x, z) + 0.9, z })),
+  ...M_FOOT.map(([x, z, dy = 0]) => ({ x: footCenter(z) + x, y: footGround(footCenter(z) + x, z) + 0.9 + dy, z })),
   { x: 0, y: 1.2, z: -60.5 }, { x: 0, y: 0.1, z: -65 }, { x: 0, y: 1.2, z: -69.5 },        // along the rope arc
   { x: 0.8, y: FOOT.landY + 0.9, z: -84 }, { x: 0, y: FOOT.stepTop + 0.9, z: -110 },
   ...M_RIVER.map(([off, z]) => { const s = sAtZ(z), f = riverAt(s);

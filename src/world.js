@@ -1,8 +1,8 @@
 // Twin Moon River — the world, built from level.js. Step 2 greybox: every prop is a placeholder shape in the final
 // palette, placed where its generated model will go (step 3 swaps them for GLBs).
 import * as THREE from 'three';
-import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS } from './level.js';
-import { PALETTE as C } from './config.js';
+import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS, ROOTS, COLLIDERS } from './level.js';
+import { PALETTE as C, SUN, TUNING } from './config.js';
 
 const col = c => new THREE.Color(c);
 const lerpC = (a, b, t) => col(a).lerp(col(b), Math.min(1, Math.max(0, t)));
@@ -79,9 +79,9 @@ export function buildWorld(scene) {
   // ------------------------------------------------------------------------------------------ sky + moons
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: col(C.skyTop) }, bottom: { value: col(C.skyHorizon) } },
+    uniforms: { top: { value: col(C.skyTop) }, bottom: { value: col(C.skyHorizon) }, glow: { value: col(C.sunGlow) }, sunDir: { value: new THREE.Vector3(...SUN.dir).normalize() } },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
-    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.6 + 0.08, 0., 1.); gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.);\n#include <colorspace_fragment>\n}',
+    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform vec3 glow; uniform vec3 sunDir; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.6 + 0.08, 0., 1.); vec3 c = mix(bottom, top, pow(h, 0.8)); float s = max(dot(normalize(vP), sunDir), 0.); c += glow * (pow(s, 6.) * 0.35 + pow(s, 60.) * 0.6); c += vec3(1.) * pow(s, 900.) * 1.5; gl_FragColor = vec4(c, 1.);\n#include <colorspace_fragment>\n}',
   }));
   sky.renderOrder = -10; scene.add(sky);
   const moonTex = (inner, outer, ring) => canvasTex(256, 256, (x, w, h) => {
@@ -141,6 +141,19 @@ export function buildWorld(scene) {
   };
   floor(42, FOOT.edgeZ, (x, z) => footGround(x, z));
   floor(FOOT.farZ, FOOT.stepsZ0, () => FOOT.landY);
+  // roots across the trail (jump them) with glowing alien nodules, and boulders to run around
+  const barkM = std(C.bark, { roughness: 0.95 }), glowM = new THREE.MeshStandardMaterial({ color: C.crystal, emissive: col(C.crystal), emissiveIntensity: 0.9 });
+  for (const o of ROOTS) {
+    const c = footCenter(o.z), g = footGround(c, o.z), r = o.h / 2, pts = [];
+    for (let k = 0; k <= 8; k++) { const x = c + o.x0 - 0.8 + (o.x1 - o.x0 + 1.6) * k / 8; const lift = k === 0 || k === 8 ? -0.35 : 0; pts.push(new THREE.Vector3(x, g + r + lift + 0.05 * Math.sin(k * 1.7), o.z + 0.12 * Math.sin(k * 2.3))); }
+    const root = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, r, 8), barkM);
+    root.castShadow = root.receiveShadow = true; scene.add(root);
+    for (let k = 1; k < 8; k += 2) { const n = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), glowM); n.position.copy(pts[k]).add(new THREE.Vector3(0, r * 0.9, 0)); scene.add(n); }
+  }
+  for (const o of COLLIDERS) {
+    const b = new THREE.Mesh(new THREE.DodecahedronGeometry(o.r * 1.15, 0), std(C.rockDark, { flatShading: true }));
+    b.position.set(o.x, footGround(o.x, o.z) + o.r * 0.55, o.z); b.rotation.set(o.z, o.x, 0.3); b.castShadow = b.receiveShadow = true; scene.add(b);
+  }
   // cliff faces of the chasm + mist + a waterfall
   const face = (z, yTop, flip) => {
     const rows = [];
@@ -169,7 +182,7 @@ export function buildWorld(scene) {
     scene.add(h);
   }
   // the alien tree: trunk out of the left chasm wall, a branch out to the rope anchor, a glowing pod
-  const bark = std(0x6f5a9e, { roughness: 0.9 });
+  const bark = std(C.bark, { roughness: 0.9 });
   const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-12, -30, -63), new THREE.Vector3(-10, -6, -63.5), new THREE.Vector3(-8, 8, -64.5), new THREE.Vector3(-6.5, 12, -65)]), 20, 1.1, 8), bark);
   const branch = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-7, 11.5, -65), new THREE.Vector3(-3.5, 13.6, -65), FOOT.anchor.clone().add(new THREE.Vector3(0, 0.35, 0)), new THREE.Vector3(1.8, 13.0, -65)]), 24, 0.42, 8), bark);
   trunk.castShadow = branch.castShadow = true; scene.add(trunk, branch);
@@ -215,7 +228,7 @@ export function buildWorld(scene) {
   const uv = [];
   waterRows.forEach((row, i) => row.forEach((p, j) => uv.push(j / 6 * 2, i / 9)));
   waterGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: flowTex, roughness: 0.2, metalness: 0.05, transparent: true, opacity: 0.95, side: THREE.DoubleSide }));
+  const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: flowTex, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: col(C.water), emissiveIntensity: 0.22 }));
   water.receiveShadow = true; scene.add(water);
   W.anim.push((dt, t, p) => { flowTex.offset.y += dt * (p?.raft ? 0.55 : 0.5); });
 
@@ -312,13 +325,13 @@ export function buildWorld(scene) {
   const oars = [];
   for (const s of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(s * 0.8, 0.45, 0.1);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), std(0xd9cfee)); shaft.rotation.z = s * 1.25; shaft.position.set(s * 0.95, -0.35, 0); pivot.add(shaft);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), std(C.oar)); shaft.rotation.z = s * 1.25; shaft.position.set(s * 0.95, -0.35, 0); pivot.add(shaft);
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.28), std(C.vybs)); blade.position.set(s * 1.95, -0.72, 0); pivot.add(blade);
     raft.add(pivot); oars.push(pivot);
   }
   raft.traverse(o => { if (o.isMesh) o.castShadow = true; });
   scene.add(raft);
-  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 6), std(0xf3e2b6, { roughness: 0.8 }));
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 6), std(C.rope, { roughness: 0.8 }));
   rope.visible = false; scene.add(rope);
   W.raft = raft;
 
@@ -343,8 +356,9 @@ export function buildWorld(scene) {
     // rope from the glowing pod to the hands
     rope.visible = p.mode === 'rope';
     if (rope.visible && hero?.hands) {
-      d.copy(hero.hands).sub(FOOT.anchor); const len = d.length();
-      mid.copy(FOOT.anchor).addScaledVector(d, 0.5);
+      const k = p.throwT > 0 ? 1 - p.throwT / TUNING.throwTime : 1;          // the rope flies from the hands to the branch
+      d.copy(FOOT.anchor).sub(hero.hands).multiplyScalar(-k); const len = d.length();
+      mid.copy(hero.hands).addScaledVector(d, -0.5);
       rope.position.copy(mid); rope.scale.set(1, len, 1); rope.quaternion.setFromUnitVectors(up, d.normalize());
     }
   };
