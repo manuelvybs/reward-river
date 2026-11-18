@@ -14,3 +14,4 @@ art-src/film/*.mp4
 art-src/film/video/
 art-src/film/*.png
 *.log
+art-src/live/
