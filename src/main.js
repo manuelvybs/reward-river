@@ -19,6 +19,7 @@ const Q = new URLSearchParams(location.search);
 const $ = id => document.getElementById(id);
 const STEP = 1 / 120;
 const DEBUG_CAM = Q.get('cam')?.split(',').map(Number);   // review shots: ?cam=px,py,pz,tx,ty,tz[,fov]
+const REL_CAM = Q.get('camrel')?.split(',').map(Number);  // review shots relative to the hero: ?camrel=right,up,back[,fov]
 
 // ------------------------------------------------------------------------------------------ renderer + scene
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -48,8 +49,10 @@ const fx = new FX(scene); fx.setScale(innerHeight);
 { // sky reflections on the water: a PMREM environment rendered once from the sky dome
   const pmrem = new THREE.PMREMGenerator(renderer), envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(world.sky.geometry, world.sky.material));
+  world.sky.material.uniforms.sunAmt.value = 0.15;          // reflect the sky, not a blinding sun disc
   const env = pmrem.fromScene(envScene, 0.03).texture;
-  for (const m of world.waterMats) { m.envMap = env; m.envMapIntensity = 0.85; m.roughness = 0.14; m.needsUpdate = true; }
+  world.sky.material.uniforms.sunAmt.value = 1;
+  for (const m of world.waterMats) { m.envMap = env; m.envMapIntensity = 0.7; m.roughness = 0.3; m.needsUpdate = true; }   // broad, soft sun glint
   pmrem.dispose();
 }
 const input = new Input(renderer.domElement);
@@ -90,6 +93,11 @@ const SFX = {
   release: () => sound.play('swing_whoosh', 0.8),
   collect: k => { sound.play('collect', 0.55, 1 + (player.medals.size % 5) * 0.05); const m = MEDALS[k]; fx.emit('glow', v3.set(m.x, m.y, m.z), 18, { color: GOLD, size: 0.55, life: 0.7, speed: 2.4, up: 2, gravity: 3, alpha: 1 }); },
   respawn: () => { sound.play('respawn', 0.6); setTimeout(() => fx.emit('glow', v3.copy(player.pos).add({ x: 0, y: 0.7, z: 0 }), 26, { color: [1, 0.95, 0.8], size: 0.5, life: 0.9, speed: 1.6, up: 1.4, alpha: 0.9 }), 120); },
+  stroke: d => {
+    sound.play('paddle', d.rowing ? 0.5 : 0.25, 0.9 + Math.random() * 0.2);
+    const p = player, c = Math.cos(p.yaw), s = Math.sin(p.yaw);
+    for (const sd of [-1, 1]) fx.emit('soft', v3.set(p.pos.x + c * sd * 1.9 + s * 0.5, p.pos.y, p.pos.z - s * sd * 1.9 + c * 0.5), d.rowing ? 6 : 3, { color: SPRAY, size: 0.4, life: 0.6, speed: 0.8, up: 1.4, gravity: 8, alpha: 0.75 });
+  },
   board: () => { sound.play('board', 0.8); setTimeout(() => fx.emit('soft', feet(), 22, { color: SPRAY, size: 0.6, life: 0.9, speed: 2, up: 2.8, gravity: 9, alpha: 0.8 }), 700); },
   bump: () => { sound.play('bump', 0.9, 0.9 + Math.random() * 0.2); fx.emit('soft', feet(), 16, { color: SPRAY, size: 0.6, life: 0.8, speed: 2.2, up: 2.4, gravity: 9, alpha: 0.8 }); cam.shake(0.22); },
   beamHit: () => { sound.play('beam_hit', 0.9); cam.shake(0.4); },
@@ -159,6 +167,11 @@ function frame() {
     camera.position.set(player.pos.x + Math.sin(a) * 4.8, player.pos.y + 1.2, player.pos.z + Math.cos(a) * 4.8);
     camera.lookAt(player.pos.x, player.pos.y + 2.1, player.pos.z);       // aim above: the hero waves in the lower third, under the title
   } else cam.update(paused ? 0 : dt, player);
+  if (REL_CAM && hero) {
+    const c = Math.cos(player.yaw), s = Math.sin(player.yaw), h = hero.root.position;
+    camera.position.set(h.x + c * REL_CAM[0] - s * REL_CAM[2], h.y + REL_CAM[1], h.z - s * REL_CAM[0] - c * REL_CAM[2]);
+    camera.lookAt(h.x, h.y + 0.6, h.z); if (REL_CAM[3]) { camera.fov = REL_CAM[3]; camera.updateProjectionMatrix(); }
+  }
   if (DEBUG_CAM) { camera.position.set(DEBUG_CAM[0], DEBUG_CAM[1], DEBUG_CAM[2]); camera.lookAt(DEBUG_CAM[3], DEBUG_CAM[4], DEBUG_CAM[5]); if (DEBUG_CAM[6]) { camera.fov = DEBUG_CAM[6]; camera.updateProjectionMatrix(); } }
 
   world.update(paused ? 0 : dt, t, player, hero, camera);
@@ -171,7 +184,7 @@ function frame() {
 }
 
 // ------------------------------------------------------------------------------------------ sound beds, steps, strokes
-let stepT = 0, paddleT = 0, wasDuck = false;
+let stepT = 0, wasDuck = false;
 function updateSound(dt) {   // sound calls are no-ops until audio is ready; the particles here always run
   const p = player, onRiver = p.mode === 'raft' || p.mode === 'end' || p.mode === 'board';
   sound.music(state === 'end' || p.mode === 'end' ? 'music_end' : onRiver ? 'music_river' : 'music_canyon');
@@ -188,15 +201,8 @@ function updateSound(dt) {   // sound calls are no-ops until audio is ready; the
     stepT -= dt * Math.abs(p.speed);
     if (stepT <= 0) { stepT = 1.55; const stone = p.pos.z < FOOT.stepsZ0 + 0.5 && p.pos.z > FOOT.quayZ - 3; sound.play(stone ? 'step_stone' : 'steps', 0.35 + 0.2 * Math.random(), 0.9 + Math.random() * 0.2); if (!stone) fx.emit('soft', feet(), 3, { color: SAND, size: 0.45, life: 0.6, speed: 0.6, up: 0.3, alpha: 0.45 }); }
   } else stepT = 0;
-  if (p.mode === 'raft' && p.raft.rowing) {   // in step with the oars: a splash at each blade
-    paddleT -= dt;
-    if (paddleT <= 0) {
-      paddleT = 2 * Math.PI / 7; sound.play('paddle', 0.5, 0.9 + Math.random() * 0.2);
-      for (const sd of [-1, 1]) fx.emit('soft', v3.set(p.pos.x + Math.cos(p.yaw) * sd * 1.9, p.pos.y, p.pos.z - Math.sin(p.yaw) * sd * 1.9), 5, { color: SPRAY, size: 0.4, life: 0.6, speed: 0.8, up: 1.4, gravity: 8, alpha: 0.75 });
-    }
-  } else paddleT = 0.15;
-  if (p.mode === 'raft' && p.raft.duck && !wasDuck) sound.play('duck', 0.6);
-  wasDuck = p.mode === 'raft' && p.raft.duck;
+  if (p.mode === 'raft' && p.raft.duck > 0.5 && !wasDuck) sound.play('duck', 0.6);
+  wasDuck = p.mode === 'raft' && p.raft.duck > 0.5;
   // raft wake and rapids spray
   if (p.mode === 'raft' || p.mode === 'end') {
     wakeT -= dt;

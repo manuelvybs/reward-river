@@ -3,7 +3,7 @@
 // modes: foot (run the trail / landing / steps) -> air (jump, fall, stumble) -> rope (pendulum under the anchor)
 //        -> board (hop from the quay onto the raft) -> raft (ride the river) -> end (lagoon)
 // input: { up, down, left, right, jump (held), jumpPressed (this step only) }
-// events (onEvent(name, data)): jump, land, stumble, throw, release, collect, respawn, board, bump, beamHit, splash,
+// events (onEvent(name, data)): jump, land, stumble, throw, release, collect, respawn, board, bump, beamHit, splash, stroke,
 //                               checkpoint, end
 import * as THREE from 'three';
 import { FOOT, footGround, footCenter, footWidth, RIVER, riverAt, OBSTACLES, MEDALS, CHECKPOINTS, ROOTS, COLLIDERS } from './level.js';
@@ -23,7 +23,7 @@ export class Player {
     this.speed = 0;                     // along the trail, + = forward
     this.airTime = 0; this.coyote = 0; this.jumpBuf = 0; this.stumble = 0; this.throwT = 0;
     this.rope = { len: 0 };
-    this.raft = { s: 0, off: 0, vd: 0, y: 0, vy: 0, speed: 0, duck: false, rowing: false, bump: 0, bumpCool: 0 };
+    this.raft = { s: 0, off: 0, vd: 0, y: 0, vy: 0, speed: 0, duck: 0, rowing: false, bump: 0, bumpCool: 0, phase: 0 };
     this.board = null;
     this.medals = new Set();
     this.respawns = 0;
@@ -45,7 +45,7 @@ export class Player {
       this.mode = 'foot'; this.yaw = Math.PI;
     } else {
       const r = this.raft, f = riverAt(CHECKPOINTS.raft[i].s);
-      Object.assign(r, { s: f.s, off: 0, vd: 0, y: f.y, vy: 0, speed: f.current, duck: false, rowing: false, bump: 0, bumpCool: 0 });
+      Object.assign(r, { s: f.s, off: 0, vd: 0, y: f.y, vy: 0, speed: f.current, duck: 0, rowing: false, bump: 0, bumpCool: 0, phase: 0 });
       this.pos.set(f.x, f.y, f.z); this.yaw = Math.atan2(f.tx, f.tz);
       this.mode = 'raft';
     }
@@ -212,7 +212,7 @@ export class Player {
     const f = riverAt(0);
     this.board = { t: 0, from: this.pos.clone(), to: new THREE.Vector3(f.x, f.y, f.z) };
     this.mode = 'board'; this.emit('board');
-    Object.assign(this.raft, { s: 0, off: 0, vd: 0, y: f.y, vy: 0, speed: 0, duck: false, rowing: false, bump: 0, bumpCool: 0 });
+    Object.assign(this.raft, { s: 0, off: 0, vd: 0, y: f.y, vy: 0, speed: 0, duck: 0, rowing: false, bump: 0, bumpCool: 0, phase: 0 });
   }
 
   updateBoard(dt) {
@@ -239,43 +239,53 @@ export class Player {
   updateRaft(dt, i) {
     const r = this.raft;
     let f = riverAt(r.s);
-    r.duck = !!i.jump; r.rowing = !!i.up && !r.duck;
-    const target = f.current + (r.rowing ? T.row : 0) - (r.duck ? T.duckDrag : 0) - (i.down ? T.brake : 0);
-    r.speed += (Math.max(0.5, target) - r.speed) * Math.min(1, 1.6 * dt);
+    r.duck += ((i.jump ? 1 : 0) - r.duck) * Math.min(1, 14 * dt);       // 0..1, eased
+    r.rowing = !!i.up && r.duck < 0.5;
+    const target = f.current + (r.rowing ? T.row : 0) - (r.duck > 0.5 ? T.duckDrag : 0) - (i.down ? T.brake : 0);
+    r.speed += (Math.max(T.raftMinSpeed, target) - r.speed) * Math.min(1, T.raftAccel * dt);
     if (r.bump > 0) r.bump -= dt;
     r.bumpCool = Math.max(0, r.bumpCool - dt);
     const s0 = r.s;
     r.s += r.speed * dt;
     f = riverAt(r.s);
 
-    // sideways drift with momentum (+off = the river's left bank); bounce off the banks
-    r.vd += axis({ left: i.right, right: i.left }) * T.raftSteerAccel * dt;
-    r.vd *= Math.exp(-T.raftSteerDamp * dt);
+    // sideways: ease toward a steering speed (+off = the river's left bank); bounce off the banks
+    r.vd += (axis({ left: i.right, right: i.left }) * T.raftSteer - r.vd) * Math.min(1, T.raftSteerDamp * dt);
     r.off += r.vd * dt;
-    const lim = f.width / 2 - 1.6;
+    const lim = f.width / 2 - 1.7;
     if (Math.abs(r.off) > lim) {
       const sg = Math.sign(r.off); r.off = sg * lim;
       if (Math.abs(r.vd) > T.bankBounce) this.bumpRaft(0.35, { bank: sg });
       r.vd = -sg * T.bankBounce;
     }
+    // statues, crystals, rocks: slide around an elliptical footprint instead of snapping sideways
     for (const o of OBSTACLES) {
-      if (Math.abs(o.s - r.s) > o.r + T.raftRadius) continue;
-      const d = r.off - o.off, min = o.r + T.raftRadius;
-      if (Math.abs(d) < min) {
-        const sg = d >= 0 ? 1 : -1;
-        r.off = clamp(o.off + sg * min, -lim, lim); r.vd = sg * 2;
-        this.bumpRaft(0.5, o);
+      const ds = r.s - o.s;
+      if (Math.abs(ds) > o.r + 2.6) continue;
+      const dd = r.off - o.off, e = ds * 0.8, rr = o.r + T.raftRadius;
+      if (Math.hypot(e, dd) < rr) {
+        const sg = Math.sign(dd) || 1;
+        r.off = clamp(o.off + sg * Math.sqrt(Math.max(0, rr * rr - e * e)) * 1.001, -lim, lim);
+        r.vd = sg * 2.5;
+        this.bumpRaft(0.45, o);
       }
     }
-    if (s0 < RIVER.beamS && r.s >= RIVER.beamS && !r.duck) { this.emit('beamHit'); this.die(); return; }
+    if (s0 < RIVER.beamS && r.s >= RIVER.beamS && r.duck < 0.55) { this.emit('beamHit'); this.die(); return; }
 
-    if (r.y > f.y + 0.05) {                               // over a drop: fall to the new water level
-      r.vy -= T.gravity * dt; r.y += r.vy * dt;
-      if (r.y <= f.y) { if (r.vy < -4) this.emit('splash', { v: r.vy }); r.y = f.y; r.vy = 0; }
-    } else { r.y = f.y; r.vy = 0; }
+    if (r.y > f.y + 0.05) {                               // over a drop: a little airtime down to the new level
+      r.vy -= T.raftGravity * dt; r.y += r.vy * dt;
+      if (r.y <= f.y) { if (r.vy < -3) this.emit('splash', { v: r.vy }); r.y = f.y; r.vy = 0; }
+    } else { r.y += (f.y - r.y) * Math.min(1, 10 * dt); r.vy = 0; }
+
+    // the stroke cycle: rows faster while paddling, slowly while drifting, barely while ducking
+    const prev = r.phase;
+    r.phase += dt * Math.PI * (r.rowing ? 1.55 : 0.85) * (r.duck > 0.5 ? 0.3 : 1);
+    const catchN = ph => Math.floor((ph - Math.PI / 2) / (2 * Math.PI));   // blades enter the water at the catch (phase pi/2)
+    if (catchN(prev) !== catchN(r.phase)) this.emit('stroke', { rowing: r.rowing });
 
     this.pos.set(f.x + f.nx * r.off, r.y, f.z + f.nz * r.off);
-    this.yaw += angleTo(this.yaw, Math.atan2(f.tx, f.tz) + r.vd * 0.06) * Math.min(1, 5 * dt);
+    const ahead = riverAt(r.s + 4);                       // aim the bow a little ahead, lean into the drift
+    this.yaw += angleTo(this.yaw, Math.atan2(ahead.tx, ahead.tz) + r.vd * 0.05) * Math.min(1, 3 * dt);
     this.anim = 'sit'; this.animSpeed = 1;
 
     const cps = CHECKPOINTS.raft, k = this.checkpoint.i + 1;
@@ -290,7 +300,7 @@ export class Player {
     const f = riverAt(r.s);
     r.y = f.y;
     this.pos.set(f.x + f.nx * r.off, r.y, f.z + f.nz * r.off);
-    r.duck = false; r.rowing = false;
+    r.duck = 0; r.rowing = false;
     this.anim = 'sitCheer'; this.animSpeed = 1;
   }
 
@@ -303,6 +313,20 @@ export class Player {
       if (tmp.set(m.x - c.x, m.y - c.y, m.z - c.z).length() < T.collectRadius) { this.medals.add(k); this.emit('collect', k); }
     }
   }
+}
+
+// ------------------------------------------------------------------------------------------------ raft pose
+// One bob / roll / pitch for the raft and the hero seated on it, rougher near the rapids, nose down over a drop.
+export function raftPose(p) {
+  const r = p.raft, t = p.time;
+  let rough = 0;
+  for (const sd of RIVER.drops) rough = Math.max(rough, 1 - Math.abs(r.s - sd) / 25);
+  const air = r.y > riverAt(r.s).y + 0.05;
+  return {
+    bob: Math.sin(t * 2.1) * 0.045 + Math.sin(t * 3.7 + 1) * 0.02 + rough * Math.sin(t * 9.3) * 0.05,
+    roll: -r.vd * 0.035 + Math.sin(t * 1.7) * 0.02 + rough * Math.sin(t * 7.1) * 0.05,
+    pitch: Math.sin(t * 1.3) * 0.015 + (air ? 0.12 : 0) + rough * Math.sin(t * 6.3) * 0.03,
+  };
 }
 
 // ------------------------------------------------------------------------------------------------ autopilot

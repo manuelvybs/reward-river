@@ -6,7 +6,7 @@ export const TUNING = {
   run: 6.4, back: 0.5, walkBelow: 3.5, accel: 9, strafe: 3.8,          // on foot (back = fraction of run)
   jump: 7.4, gravity: 16, coyote: 0.12, jumpBuffer: 0.14, stumble: 0.6,
   ropeMin: 7, ropeMax: 15.5, pump: 3.0, releaseBoost: 1.2, throwTime: 0.22, holdGrapple: 2.5,
-  row: 3.2, brake: 2.5, duckDrag: 0.8, raftSteerAccel: 9, raftSteerDamp: 3, bankBounce: 1.5, raftRadius: 1.4,   // raft
+  row: 3.2, brake: 2.5, duckDrag: 0.8, raftAccel: 0.9, raftMinSpeed: 1.2, raftSteer: 5.2, raftSteerDamp: 3.2, bankBounce: 1.5, raftRadius: 1.25, raftGravity: 22,   // raft
   collectRadius: 1.4,
   deathY: -30,
 };
@@ -33,7 +33,7 @@ export const SUN = { dir: [0.55, 0.4, -0.73], intensity: 2.6 };
 export const CAMERAS = {
   foot: { fov: 52, dist: 5.4, height: 2.1, lookHeight: 1.1, ahead: 10, lag: 6, heightLag: 3 },
   rope: { fov: 40, dist: 8.0, height: 0.8, lookHeight: 0.9, ahead: 14, lag: 4.5, heightLag: 2.2 },   // longer lens, low: the helmets loom
-  raft: { fov: 50, dist: 7.0, height: 2.6, lookHeight: 0.9, ahead: 18, lag: 4, heightLag: 4 },
+  raft: { fov: 48, dist: 5.6, height: 1.9, lookHeight: 1.0, ahead: 20, lag: 4.5, heightLag: 5 },     // close and low: the rower fills the lower third
 };
 
 export const HERO = {

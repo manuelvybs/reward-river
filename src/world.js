@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS, ROOTS, COLLIDERS } from './level.js';
 import { PALETTE as C, SUN, TUNING } from './config.js';
+import { raftPose } from './player.js';
 import { terrainMaterial, tiled, boxWorldUV, atlasCell } from './paint.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -88,9 +89,9 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   // ------------------------------------------------------------------------------------------ sky + moons
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: col(C.skyTop) }, bottom: { value: col(C.skyHorizon) }, glow: { value: col(C.sunGlow) }, sunDir: { value: new THREE.Vector3(...SUN.dir).normalize() } },
+    uniforms: { top: { value: col(C.skyTop) }, bottom: { value: col(C.skyHorizon) }, glow: { value: col(C.sunGlow) }, sunDir: { value: new THREE.Vector3(...SUN.dir).normalize() }, sunAmt: { value: 1 } },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
-    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform vec3 glow; uniform vec3 sunDir; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.6 + 0.08, 0., 1.); vec3 c = mix(bottom, top, pow(h, 0.8)); float s = max(dot(normalize(vP), sunDir), 0.); c += glow * (pow(s, 6.) * 0.35 + pow(s, 60.) * 0.6); c += vec3(1.) * pow(s, 900.) * 1.5; gl_FragColor = vec4(c, 1.);\n#include <colorspace_fragment>\n}',
+    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform vec3 glow; uniform vec3 sunDir; uniform float sunAmt; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.6 + 0.08, 0., 1.); vec3 c = mix(bottom, top, pow(h, 0.8)); float s = max(dot(normalize(vP), sunDir), 0.); c += glow * (pow(s, 6.) * 0.35 + pow(s, 60.) * 0.6 * sunAmt); c += vec3(1.) * pow(s, 900.) * 1.5 * sunAmt; gl_FragColor = vec4(c, 1.);\n#include <colorspace_fragment>\n}',
   }));
   sky.renderOrder = -10; scene.add(sky); W.sky = sky;
   const moonTex = (inner, outer, ring) => canvasTex(256, 256, (x, w, h) => {
@@ -257,7 +258,7 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   const uv = [];
   waterRows.forEach((row, i) => row.forEach((p, j) => uv.push(j / 6 * 2, i / 9)));
   waterGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: flow, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: col(C.water), emissiveIntensity: T.water ? 0.1 : 0.22 }));
+  const water = new THREE.Mesh(waterGeo, new THREE.MeshPhysicalMaterial({ specularIntensity: 0.35, vertexColors: true, map: flow, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95, side: THREE.DoubleSide, emissive: col(C.water), emissiveIntensity: T.water ? 0.1 : 0.22 }));
   water.receiveShadow = true; scene.add(water); W.waterMats = [water.material];
   const lagoonFlow = tiled(flow, 8, 8);
   W.anim.push(dt => { flow.offset.y -= dt * 0.55; if (lagoonFlow) lagoonFlow.offset.y -= dt * 0.04; });
@@ -338,7 +339,7 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   // the lagoon
   {
     const f = riverAt(RIVER.endS + LAGOON_AHEAD);
-    const lag = new THREE.Mesh(new THREE.CircleGeometry(48, 48), new THREE.MeshStandardMaterial({ color: T.water ? 0xffffff : C.water, map: lagoonFlow || flowTex, roughness: 0.25, transparent: true, opacity: 0.95, emissive: col(C.water), emissiveIntensity: 0.1 }));
+    const lag = new THREE.Mesh(new THREE.CircleGeometry(48, 48), new THREE.MeshPhysicalMaterial({ specularIntensity: 0.35, color: T.water ? 0xffffff : C.water, map: lagoonFlow || flowTex, roughness: 0.25, transparent: true, opacity: 0.95, emissive: col(C.water), emissiveIntensity: 0.1 }));
     lag.rotation.x = -Math.PI / 2; lag.position.set(f.x, f.y - 0.02, f.z); scene.add(lag); W.waterMats.push(lag.material);
     const sand = new THREE.Mesh(new THREE.RingGeometry(46, 100, 48, 1, THREE.MathUtils.degToRad(310), THREE.MathUtils.degToRad(280)), sm(tiled(T.path, 14, 14), T.path ? 0xffffff : C.path)); sand.rotation.x = -Math.PI / 2; sand.position.set(f.x, f.y + 0.35, f.z); sand.receiveShadow = true; scene.add(sand);
     for (let k = 0; k < 9; k++) { const a = Math.PI * (0.15 + k * 0.09), c = crystal(1.2, 8 + k % 4 * 3); c.position.set(f.x + Math.cos(a) * 51, f.y + 0.3, f.z - Math.sin(a) * 51); scene.add(c); }
@@ -435,11 +436,14 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
       m.mesh.rotation.y = t * 2.2; m.mesh.position.y = m.y + Math.sin(t * 2.4 + m.mesh.position.z) * 0.12;
     }
     // the raft rides the water when the hero is on it, and waits at the quay before
-    const onRaft = p.mode === 'raft' || p.mode === 'end' || p.mode === 'board';
-    if (onRaft && p.mode !== 'board') { raft.position.copy(p.pos); raft.rotation.set(Math.sin(t * 2.1) * 0.03, p.yaw, Math.sin(t * 1.7) * 0.04); }
-    else if (!onRaft || p.mode === 'board') { const f = riverAt(0); raft.position.set(f.x, f.y + Math.sin(t * 1.6) * 0.04, f.z); raft.rotation.set(0, Math.atan2(f.tx, f.tz), 0); }
-    const row = p.raft?.rowing && p.mode === 'raft' ? 1 : 0;
-    oars.forEach((o, k) => { o.rotation.x = row * Math.sin(t * 7) * 0.7; o.rotation.z = (k ? -1 : 1) * (row ? 0.15 * Math.cos(t * 7) : 0.25); });
+    if (p.mode === 'raft' || p.mode === 'end') {           // the same bob / roll / pitch the seated hero rides
+      const P = raftPose(p);
+      raft.position.set(p.pos.x, p.pos.y + P.bob, p.pos.z); raft.rotation.set(P.pitch, p.yaw, P.roll, 'YXZ');
+    } else { const f = riverAt(0); raft.position.set(f.x, f.y + Math.sin(t * 1.6) * 0.04, f.z); raft.rotation.set(0, Math.atan2(f.tx, f.tz), 0, 'YXZ'); }
+    // oars: sweep fore and aft with the stroke (blades forward at the catch), dip in the water on the pull
+    const ph = p.raft?.phase || 0, duck = p.raft?.duck || 0, amp = p.mode === 'raft' ? (p.raft.rowing ? 0.55 : 0.3) : 0.08;
+    const sweep = -Math.sin(ph) * amp, lift = (0.25 + 0.17 * Math.cos(ph)) * (1 - duck * 0.5) + duck * 0.35;
+    oars.forEach((o, k) => { const side = k ? 1 : -1; o.rotation.set(0, sweep * side, side * lift, 'YXZ'); });
     // rope from the glowing pod to the hands
     rope.visible = p.mode === 'rope';
     if (rope.visible && hero?.hands) {

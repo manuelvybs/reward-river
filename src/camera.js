@@ -44,14 +44,20 @@ export class ChaseCamera {
     // keep clear of the ground (on foot) and the water (on the river)
     const g = footGround(this.pos.x, this.pos.z);
     if (Number.isFinite(g) && this.pos.y < g + 0.8) this.pos.y = g + 0.8;
-    if (p.mode === 'raft' || p.mode === 'end') { const f = riverAt(p.raft.s - 6); if (this.pos.y < f.y + 1.2) this.pos.y = f.y + 1.2; }
+    if (p.mode === 'raft' || p.mode === 'end' || p.mode === 'board') {
+      const f = riverAt(Math.max(0, (p.raft?.s || 0) - r.dist));
+      if (this.pos.y < f.y + 1.2) this.pos.y = f.y + 1.2;
+      // stay inside the river channel on bends: never behind a bank wall
+      const off = (this.pos.x - f.x) * f.nx + (this.pos.z - f.z) * f.nz, lim = f.width / 2 - 0.6;
+      if (Math.abs(off) > lim) { const k = Math.sign(off) * lim - off; this.pos.x += f.nx * k; this.pos.z += f.nz * k; }
+    }
 
     this.shakeAmt *= Math.exp(-7 * dt);
     const sh = this.shakeAmt;
     this.camera.position.set(this.pos.x + (Math.random() - 0.5) * sh, this.pos.y + (Math.random() - 0.5) * sh, this.pos.z + (Math.random() - 0.5) * sh);
     this.camera.lookAt(this.look);
     // the lens widens a little with raft speed (the rapids feel fast)
-    const fov = r.fov + (p.mode === 'raft' ? Math.min(7, Math.max(0, (p.raft.speed - 5.5) * 0.9)) : 0);
+    const fov = r.fov + (p.mode === 'raft' ? Math.min(4, Math.max(0, (p.raft.speed - 6) * 0.7)) : 0);
     this.fovNow = (this.fovNow ?? fov) + (fov - (this.fovNow ?? fov)) * Math.min(1, 2 * dt);
     if (Math.abs(this.camera.fov - this.fovNow) > 0.01) { this.camera.fov = this.fovNow; this.camera.updateProjectionMatrix(); }
   }
