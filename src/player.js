@@ -6,7 +6,7 @@
 // events (onEvent(name, data)): jump, land, stumble, throw, release, collect, respawn, board, bump, beamHit, splash, stroke,
 //                               checkpoint, end
 import * as THREE from 'three';
-import { FOOT, footGround, footCenter, footWidth, RIVER, riverAt, OBSTACLES, MEDALS, CHECKPOINTS, ROOTS, COLLIDERS } from './level.js';
+import { FOOT, footGround, footCenter, footWidth, RIVER, riverAt, OBSTACLES, MEDALS, CHECKPOINTS, ROOTS, COLLIDERS, GIFTCARDS, STAR_VALUE } from './level.js';
 import { TUNING as T } from './config.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -26,6 +26,7 @@ export class Player {
     this.raft = { s: 0, off: 0, vd: 0, y: 0, vy: 0, speed: 0, duck: 0, rowing: false, bump: 0, bumpCool: 0, phase: 0 };
     this.board = null;
     this.medals = new Set();
+    this.cards = new Set();
     this.respawns = 0;
     this.time = 0;
     this.anim = 'idle';
@@ -312,7 +313,16 @@ export class Player {
       if (Math.abs(m.z - c.z) > 3) continue;
       if (tmp.set(m.x - c.x, m.y - c.y, m.z - c.z).length() < T.collectRadius) { this.medals.add(k); this.emit('collect', k); }
     }
+    for (let k = 0; k < GIFTCARDS.length; k++) {
+      if (this.cards.has(k)) continue;
+      const g = GIFTCARDS[k];
+      if (Math.abs(g.z - c.z) > 3) continue;
+      if (tmp.set(g.x - c.x, g.y - c.y, g.z - c.z).length() < T.cardRadius) { this.cards.add(k); this.emit('card', k); }
+    }
   }
+
+  // dollars earned: stars + gift cards
+  get rewards() { let r = this.medals.size * STAR_VALUE; for (const k of this.cards) r += GIFTCARDS[k].value; return r; }
 }
 
 // ------------------------------------------------------------------------------------------------ raft pose
@@ -366,6 +376,11 @@ export function autopilot(p) {
         const m = MEDALS[k]; if (!m.river || p.medals.has(k)) continue;
         const ahead = m.s - r.s; if (ahead < 0 || ahead > 28) continue;
         cost += Math.min(6, Math.abs(off - m.off)) - 6;
+      }
+      for (let k = 0; k < GIFTCARDS.length; k++) {          // gift cards pull harder than stars
+        const g = GIFTCARDS[k]; if (!g.river || p.cards.has(k)) continue;
+        const ahead = g.s - r.s; if (ahead < 0 || ahead > 32) continue;
+        cost += (Math.min(6, Math.abs(off - g.off)) - 6) * 2.5;
       }
       if (cost < bestCost) { bestCost = cost; best = off; }
     }

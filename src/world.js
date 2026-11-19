@@ -1,7 +1,7 @@
 // Reward River — the world, built from level.js. Step 2 greybox: every prop is a placeholder shape in the final
 // palette, placed where its generated model will go (step 3 swaps them for GLBs).
 import * as THREE from 'three';
-import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS, ROOTS, COLLIDERS } from './level.js';
+import { FOOT, footCenter, footWidth, footGround, RIVER, riverAt, OBSTACLES, MEDALS, ROOTS, COLLIDERS, GIFTCARDS } from './level.js';
 import { PALETTE as C, SUN, TUNING } from './config.js';
 import { raftPose } from './player.js';
 import { terrainMaterial, tiled, boxWorldUV, atlasCell } from './paint.js';
@@ -397,7 +397,51 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
   const medalMat = std(C.gold, { roughness: 0.35, metalness: 0.3, emissive: col(0xffb000), emissiveIntensity: 0.45 });
   MEDALS.forEach((m, k) => { const mesh = new THREE.Mesh(medalGeo, medalMat); mesh.position.set(m.x, m.y, m.z); mesh.castShadow = true; scene.add(mesh); W.medals.push({ mesh, y: m.y, got: false, t: 0 }); });
   W.collect = k => { const m = W.medals[k]; if (m) { m.got = true; m.t = 0; } };
-  W.resetMedals = () => W.medals.forEach(m => { m.got = false; m.mesh.visible = true; m.mesh.scale.setScalar(1); });
+  W.resetMedals = () => {
+    W.medals.forEach(m => { m.got = false; m.mesh.visible = true; m.mesh.scale.setScalar(1); });
+    W.cards.forEach(c => { c.got = false; c.g.visible = true; c.g.scale.setScalar(1); });
+  };
+
+  // ------------------------------------------------------------------------------------------ VYBS gift cards
+  // a rounded card slab (front art from cards.js, gold edge) with a soft gold halo, spinning and bobbing
+  W.cards = [];
+  {
+    const CW = 1.2, CH = 0.75, R = 0.09, shape = new THREE.Shape();
+    shape.moveTo(-CW / 2 + R, -CH / 2); shape.lineTo(CW / 2 - R, -CH / 2); shape.quadraticCurveTo(CW / 2, -CH / 2, CW / 2, -CH / 2 + R);
+    shape.lineTo(CW / 2, CH / 2 - R); shape.quadraticCurveTo(CW / 2, CH / 2, CW / 2 - R, CH / 2); shape.lineTo(-CW / 2 + R, CH / 2);
+    shape.quadraticCurveTo(-CW / 2, CH / 2, -CW / 2, CH / 2 - R); shape.lineTo(-CW / 2, -CH / 2 + R); shape.quadraticCurveTo(-CW / 2, -CH / 2, -CW / 2 + R, -CH / 2);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2 });
+    geo.translate(0, 0, -0.0175);
+    const edge = std(C.gold, { roughness: 0.3, metalness: 0.6, emissive: col(0xffb000), emissiveIntensity: 0.25 });
+    const haloTex = canvasTex(128, 128, (x, w, h) => { const g = x.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(255,214,90,0.75)'); g.addColorStop(1, 'rgba(255,214,90,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }, false);
+    const haloMat = new THREE.SpriteMaterial({ map: haloTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+    const faceMats = new Map();
+    const faceFor = v => {
+      if (!faceMats.has(v)) {
+        const art = paint.cardArt?.(v);
+        const t = art ? new THREE.CanvasTexture(art) : null;
+        if (t) { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(1 / CW, 1 / CH); t.offset.set(0.5, 0.5); }   // extrude UVs are shape coords
+        faceMats.set(v, new THREE.MeshStandardMaterial({ map: t, color: t ? 0xffffff : C.vybs, roughness: 0.45, emissive: col(0xffffff), emissiveMap: t, emissiveIntensity: t ? 0.35 : 0 }));
+      }
+      return faceMats.get(v);
+    };
+    // the slab is all gold; the art sits on two flat faces, the back one turned around so it never reads mirrored
+    const faceGeo = new THREE.ShapeGeometry(shape, 6);
+    GIFTCARDS.forEach(c => {
+      const g = new THREE.Group(), card = new THREE.Group(), slab = new THREE.Mesh(geo, edge);
+      slab.castShadow = true; card.add(slab);
+      for (const side of [1, -1]) {
+        const f = new THREE.Mesh(faceGeo, faceFor(c.value));
+        f.position.z = side * 0.031; if (side < 0) f.rotation.y = Math.PI;
+        card.add(f);
+      }
+      g.add(card);
+      const halo = new THREE.Sprite(haloMat); halo.scale.setScalar(c.value >= 25 ? 2.6 : 2.1); halo.renderOrder = 4; g.add(halo);
+      g.position.set(c.x, c.y, c.z); scene.add(g);
+      W.cards.push({ g, card, y: c.y, got: false, t: 0, phase: c.z * 0.37 });
+    });
+  }
+  W.collectCard = k => { const c = W.cards[k]; if (c) { c.got = true; c.t = 0; } };
 
   // ------------------------------------------------------------------------------------------ raft + rope
   const raft = new THREE.Group();
@@ -434,6 +478,11 @@ export function buildWorld(scene, paint = { tex: {}, backdrops: {}, sprites: {} 
     for (const m of W.medals) {
       if (m.got) { m.t += dt; m.mesh.scale.setScalar(Math.max(0, 1 - m.t * 3)); m.mesh.position.y = m.y + m.t * 3; if (m.t > 0.4) m.mesh.visible = false; continue; }
       m.mesh.rotation.y = t * 2.2; m.mesh.position.y = m.y + Math.sin(t * 2.4 + m.mesh.position.z) * 0.12;
+    }
+    for (const c of W.cards) {
+      if (c.got) { c.t += dt; c.g.scale.setScalar(Math.max(0, 1 + c.t * 2 - c.t * c.t * 9)); c.g.position.y = c.y + c.t * 4; c.card.rotation.y += dt * 14; if (c.t > 0.5) c.g.visible = false; continue; }
+      c.card.rotation.y = Math.sin(t * 1.4 + c.phase) * 0.9 + t * 0.6; c.card.rotation.z = Math.sin(t * 1.1 + c.phase) * 0.08;
+      c.g.position.y = c.y + Math.sin(t * 2 + c.phase) * 0.15;
     }
     // the raft rides the water when the hero is on it, and waits at the quay before
     if (p.mode === 'raft' || p.mode === 'end') {           // the same bob / roll / pitch the seated hero rides

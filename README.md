@@ -17,6 +17,10 @@ Run the canyon, swing the chasm and ride the river with the VYBS astronaut. A br
 
 Gamepads work too. Best on a laptop, or a phone in landscape. Add `?lowq` to the URL on slow devices.
 
+## Rewards
+
+Gold stars are worth $0.50 each. Nine VYBS gift cards ($5, $10 and $25) sit in the skill spots: high over the trail, late in the rope swing, between the river pillars, past the antenna, under the rocket arch, between the rapids rocks and at the lagoon. The wallet under the star counter adds them up, and the end screen shows your total and every card you collected.
+
 ## How it was made
 
 The gameplay beats follow fal's "Saffron River" showcase (run, rope swing, raft, rapids). The code is our own, and every asset was generated for this game:

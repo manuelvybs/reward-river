@@ -13,7 +13,8 @@ import { Sound } from './audio.js';
 import { Post } from './post.js';
 import { FX } from './fx.js';
 import { PALETTE, GAME, SUN } from './config.js';
-import { MEDALS, RIVER, FOOT, riverAt } from './level.js';
+import { MEDALS, RIVER, FOOT, riverAt, GIFTCARDS } from './level.js';
+import { loadCardArt } from './cards.js';
 
 const Q = new URLSearchParams(location.search);
 const $ = id => document.getElementById(id);
@@ -43,7 +44,8 @@ sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
 const SUN_DIR = new THREE.Vector3(...SUN.dir).normalize();
 
-const world = buildWorld(scene, await loadPaint());
+const cardArt = await loadCardArt();
+const world = buildWorld(scene, { ...(await loadPaint()), cardArt });
 const post = new Post(renderer, scene, camera, Q);
 const fx = new FX(scene); fx.setScale(innerHeight);
 { // sky reflections on the water: a PMREM environment rendered once from the sky dome
@@ -80,7 +82,26 @@ function keyPilot() {
   if (a.jumpPressed) { pressKey('Space', false); pressKey('Space', true); } else pressKey('Space', !!a.jump);
 }
 
+// HUD: stars + a rewards wallet that counts up to the player's total
+let walletShown = 0;
+const money = v => `$${v.toFixed(2)}`;
 function setMedals() { $('medalCount').textContent = player.medals.size; }
+function tickWallet(dt) {
+  const target = player.rewards;
+  if (walletShown === target) return;
+  walletShown = target < walletShown ? target : Math.min(target, walletShown + Math.max(0.5, (target - walletShown) * 6) * dt);
+  $('walletAmt').textContent = money(walletShown);
+  $('wallet').classList.toggle('pop', target - walletShown > 0.01);
+}
+// card pop-up: the card art slides in under the HUD with its value
+let toastT = 0;
+function cardToast(value) {
+  const art = cardArt(value);
+  $('toastImg').src = art.toDataURL('image/png');
+  $('toastAmt').textContent = `+$${value}`;
+  const t = $('toast'); t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2000);
+}
 function fade() { const f = $('fade'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 380); }
 
 const SAND = [0.92, 0.8, 0.62], SPRAY = [0.93, 0.99, 1], GOLD = [1, 0.84, 0.32], v3 = new THREE.Vector3();
@@ -92,6 +113,13 @@ const SFX = {
   throw: () => sound.play('rope_throw', 0.8),
   release: () => sound.play('swing_whoosh', 0.8),
   collect: k => { sound.play('collect', 0.55, 1 + (player.medals.size % 5) * 0.05); const m = MEDALS[k]; fx.emit('glow', v3.set(m.x, m.y, m.z), 18, { color: GOLD, size: 0.55, life: 0.7, speed: 2.4, up: 2, gravity: 3, alpha: 1 }); },
+  card: k => {
+    const g = GIFTCARDS[k];
+    sound.play('reward', 0.8); sound.play('collect', 0.4, 1.3);
+    fx.emit('glow', v3.set(g.x, g.y, g.z), 34, { color: GOLD, size: 0.7, life: 0.9, speed: 3, up: 2.6, gravity: 3, alpha: 1 });
+    fx.emit('glow', v3.set(g.x, g.y, g.z), 16, { color: [0.62, 0.66, 1], size: 0.55, life: 0.8, speed: 2.2, up: 2, gravity: 2, alpha: 0.9 });
+    cardToast(g.value);
+  },
   respawn: () => { sound.play('respawn', 0.6); setTimeout(() => fx.emit('glow', v3.copy(player.pos).add({ x: 0, y: 0.7, z: 0 }), 26, { color: [1, 0.95, 0.8], size: 0.5, life: 0.9, speed: 1.6, up: 1.4, alpha: 0.9 }), 120); },
   stroke: d => {
     sound.play('paddle', d.rowing ? 0.5 : 0.25, 0.9 + Math.random() * 0.2);
@@ -106,6 +134,7 @@ const SFX = {
 player.onEvent = (e, d) => {
   SFX[e]?.(d);
   if (e === 'collect') { world.collect(d); setMedals(); }
+  if (e === 'card') world.collectCard(d);
   if (e === 'respawn') { fade(); setTimeout(() => cam.update(1 / 60, player, true), 200); }
   if (e === 'end') endGame(d);
 };
@@ -119,15 +148,18 @@ function start() {
   cam.update(1 / 60, player, true);
 }
 function restart() {
-  player.respawnAt('foot', 0); player.medals.clear(); player.respawns = 0; player.time = 0; player.mode = 'foot';
-  world.resetMedals(); setMedals(); show('end', false); show('hud', true); state = 'play'; fade();
+  player.respawnAt('foot', 0); player.medals.clear(); player.cards.clear(); player.respawns = 0; player.time = 0; player.mode = 'foot';
+  world.resetMedals(); setMedals(); walletShown = 0; $('walletAmt').textContent = money(0); show('end', false); show('hud', true); state = 'play'; fade();
   cam.update(1 / 60, player, true);
 }
 function endGame(d) {
   state = 'end';
   setTimeout(() => {
     const m = Math.floor(d.time / 60), s = Math.floor(d.time % 60);
-    $('endStats').textContent = `${player.medals.size} / ${MEDALS.length} stars · ${m}:${String(s).padStart(2, '0')} · ${player.respawns} ${player.respawns === 1 ? 'retry' : 'retries'}`;
+    $('endRewards').textContent = `${money(player.rewards)} in rewards`;
+    $('endStats').textContent = `${player.cards.size} / ${GIFTCARDS.length} gift cards · ${player.medals.size} / ${MEDALS.length} stars · ${m}:${String(s).padStart(2, '0')} · ${player.respawns} ${player.respawns === 1 ? 'retry' : 'retries'}`;
+    $('endCards').innerHTML = '';
+    for (const k of [...player.cards].sort((a, b) => a - b)) { const img = new Image(); img.src = cardArt(GIFTCARDS[k].value).toDataURL('image/png'); img.alt = `$${GIFTCARDS[k].value} gift card`; $('endCards').appendChild(img); }
     show('end', true);
   }, 1600);
 }
@@ -176,6 +208,7 @@ function frame() {
 
   world.update(paused ? 0 : dt, t, player, hero, camera);
   if (!paused) { updateSound(dt); fx.update(dt); }
+  tickWallet(dt);
   post.watch(dt, state === 'play' && !paused);
   sun.position.copy(player.pos).addScaledVector(SUN_DIR, 60);
   sun.target.position.copy(player.pos);
@@ -219,7 +252,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 window.__game = {
   ready: false, player, world, scene, camera, sound, post, renderer,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, fps: +post.fps.toFixed(0), quality: post.level }), level: { beamS: RIVER.beamS, archS: RIVER.archS, endS: RIVER.endS, edgeZ: FOOT.edgeZ, farZ: FOOT.farZ },
-  state: () => ({ state, mode: player.mode, z: +player.pos.z.toFixed(2), y: +player.pos.y.toFixed(2), s: +player.raft.s.toFixed(1), medals: player.medals.size, respawns: player.respawns, time: +player.time.toFixed(1), checkpoint: player.checkpoint }),
+  state: () => ({ cards: player.cards.size, rewards: player.rewards, state, mode: player.mode, z: +player.pos.z.toFixed(2), y: +player.pos.y.toFixed(2), s: +player.raft.s.toFixed(1), medals: player.medals.size, respawns: player.respawns, time: +player.time.toFixed(1), checkpoint: player.checkpoint }),
   start: () => start(), restart: () => restart(), autopilot: on => { auto = on; },
 };
 

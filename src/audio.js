@@ -2,7 +2,7 @@
 //   one-shots: play(name, vol, rate)     loops: loop(name, vol, rate) every frame (smoothed), vol 0 = silent
 //   music: music(name) crossfades        mute(): toggles the master
 export const ONESHOTS = ['steps', 'step_stone', 'jump', 'land', 'stumble', 'rope_throw', 'swing_whoosh', 'paddle', 'bump',
-  'splash_big', 'duck', 'beam_hit', 'collect', 'respawn', 'board'];
+  'splash_big', 'duck', 'beam_hit', 'collect', 'respawn', 'board', 'reward'];
 export const LOOPS = ['rope_creak', 'waterfall', 'canyon', 'river', 'rapids', 'raft_creak'];
 export const MUSIC = ['music_canyon', 'music_river', 'music_end'];
 

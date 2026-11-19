@@ -112,6 +112,21 @@ export const MEDALS = [
     return { river: true, s, off, x: f.x + f.nx * off, y: f.y + 1.0, z: f.z + f.nz * off }; }),
 ];
 
+// rewards: every star is worth STAR_VALUE dollars; VYBS gift cards sit in the skill spots
+export const STAR_VALUE = 0.5;
+const C_FOOT = [   // [x from the trail centre (or absolute over the chasm), y above the ground (or absolute), z, value]
+  { x: -1.3, dy: 2.2, z: -22, value: 5 },                    // high over the trail: jump for it
+  { x: 0, y: 1.4, z: -72, value: 10, abs: true },             // late in the rope swing, over the far ledge
+  { x: 0, dy: 1.0, z: -114.5, value: 5 },                     // the quay, before you board
+];
+const C_RIVER = [[0, -205, 10], [3.5, -315, 5], [0, -378, 10], [0, -450, 25], [-1, -505, 10], [0, -598, 25]];   // [offset, z, value]
+export const GIFTCARDS = [
+  ...C_FOOT.map(c => c.abs ? { x: c.x, y: c.y, z: c.z, value: c.value }
+    : { x: footCenter(c.z) + c.x, y: footGround(footCenter(c.z) + c.x, c.z) + c.dy, z: c.z, value: c.value }),
+  ...C_RIVER.map(([off, z, value]) => { const s = sAtZ(z), f = riverAt(s);
+    return { river: true, s, off, x: f.x + f.nx * off, y: f.y + 1.1, z: f.z + f.nz * off, value }; }),
+];
+
 export const CHECKPOINTS = {
   foot: [{ z: FOOT.startZ - 2 }, { z: FOOT.edgeZ + 6 }, { z: FOOT.farZ - 4 }],
   raft: [{ s: 0 }, { s: RIVER.beamS - 40 }, { s: sAtZ(-462) }],

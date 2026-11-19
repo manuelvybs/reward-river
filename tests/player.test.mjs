@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Player, autopilot } from '../src/player.js';
-import { FOOT, RIVER, MEDALS, ROOTS } from '../src/level.js';
+import { FOOT, RIVER, MEDALS, ROOTS, GIFTCARDS, STAR_VALUE } from '../src/level.js';
 
 const DT = 1 / 60;
 const idle = () => ({ up: false, down: false, left: false, right: false, jump: false, jumpPressed: false });
@@ -102,6 +102,25 @@ test('not ducking at the antenna beam knocks you back to the checkpoint; ducking
   assert.equal(b.respawns, 0);
 });
 
+test('gift cards sit on both halves, worth $5 to $25', () => {
+  assert.ok(GIFTCARDS.some(c => !c.river) && GIFTCARDS.filter(c => c.river).length >= 4);
+  assert.ok(GIFTCARDS.every(c => [5, 10, 25].includes(c.value)));
+});
+
+test('a gift card is collected once and adds its value to the rewards', () => {
+  const p = new Player();
+  const ev = [];
+  p.onEvent = (e, d) => ev.push([e, d]);
+  const k = GIFTCARDS.findIndex(c => c.river);
+  const c = GIFTCARDS[k];
+  p.respawnAt('raft', 0);
+  p.pos.set(c.x, c.y - 1.0, c.z);                        // seated on the raft right under the card
+  p.collect(); p.collect();
+  assert.equal(ev.filter(([e]) => e === 'card').length, 1);
+  assert.equal(p.cards.size, 1);
+  assert.equal(p.rewards, c.value + p.medals.size * STAR_VALUE);
+});
+
 test('autopilot plays the whole level: lagoon reached, no respawns, no trips, most medals', () => {
   const p = new Player();
   let t = 0;
@@ -113,5 +132,6 @@ test('autopilot plays the whole level: lagoon reached, no respawns, no trips, mo
   assert.ok(!ev.includes('stumble'), 'tripped on a root');
   assert.ok(t < 150, `took ${t.toFixed(1)} s`);
   assert.ok(p.medals.size >= MEDALS.length / 2, `${p.medals.size}/${MEDALS.length} medals`);
-  console.log(`autopilot: ${t.toFixed(1)} s, ${p.medals.size}/${MEDALS.length} medals, ${ev.filter(e => e === 'bump').length} bumps, events ${[...new Set(ev)].join(' ')}`);
+  assert.ok(p.cards.size >= 5, `${p.cards.size}/${GIFTCARDS.length} gift cards`);
+  console.log(`autopilot: ${t.toFixed(1)} s, ${p.medals.size}/${MEDALS.length} medals, ${p.cards.size}/${GIFTCARDS.length} cards, rewards ${p.rewards.toFixed(2)}, ${ev.filter(e => e === 'bump').length} bumps, events ${[...new Set(ev)].join(' ')}`);
 });

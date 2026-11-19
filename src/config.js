@@ -7,7 +7,7 @@ export const TUNING = {
   jump: 7.4, gravity: 16, coyote: 0.12, jumpBuffer: 0.14, stumble: 0.6,
   ropeMin: 7, ropeMax: 15.5, pump: 3.0, releaseBoost: 1.2, throwTime: 0.22, holdGrapple: 2.5,
   row: 3.2, brake: 2.5, duckDrag: 0.8, raftAccel: 0.9, raftMinSpeed: 1.2, raftSteer: 5.2, raftSteerDamp: 3.2, bankBounce: 1.5, raftRadius: 1.25, raftGravity: 22,   // raft
-  collectRadius: 1.4,
+  collectRadius: 1.4, cardRadius: 1.6,
   deathY: -30,
 };
 
